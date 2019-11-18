@@ -20,6 +20,7 @@
  * =========================================================================*/
 
 #include "fields.h"
+#include <exception>
 
 // ********** ElMagField **********
 
@@ -102,4 +103,36 @@ FieldTrace::~FieldTrace()
     delete [] trace;
 }
 
+FieldTrace & FieldTrace::operator=(const FieldTrace &t)
+{
+    // check for "self assignment" and do nothing in that case
+    if (this != &t)
+    {
+        // check for a size mismatch and throw an exception in that case
+        if (N != t.N)
+        {
+            throw(FieldTrace_SizeMismatch());
+        }
+        // copy all data from the other field trace
+        else
+        {
+            t0 = t.t0;
+            dt = t.dt;
+            for (int i=0; i<N; i++) trace[i]=t.trace[i];
+        }
+    }
+    return *this;    
+}
+
+void FieldTrace::set(int index, ElMagField f)
+{
+    if (index<0 || index>=N) throw(FieldTrace_IndexOutOfRange());
+    trace[index] = f;
+}
+
+double FieldTrace::get_time(int index)
+{
+    if (index<0 || index>=N) throw(FieldTrace_IndexOutOfRange());
+    return t0+index*dt;
+}
 

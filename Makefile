@@ -26,13 +26,17 @@ OBJECTS_DIR   = ./obj
 ####### Files
 
 HEADER = 	$(SRCDIR)/fields.h \
-	$(SRCDIR)/vector.h
+	$(SRCDIR)/vector.h \
+	$(SRCDIR)/screen.h \
+	$(SRCDIR)/global.h
 
 SRC = 	$(SRCDIR)/fields.cpp \
 	$(SRCDIR)/vector.cpp \
+	$(SRCDIR)/screen.cpp \
 	$(SRCDIR)/GaussianWavePacket.cpp
 
 OBJ = 	$(OBJDIR)/fields.o \
+	$(OBJDIR)/screen.o \
 	$(OBJDIR)/vector.o
 
 TARGETOBJ = $(OBJDIR)/GaussianWavePacket.o

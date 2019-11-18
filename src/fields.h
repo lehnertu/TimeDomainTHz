@@ -79,6 +79,10 @@ private:
 
 };
 
+/*  Assignments of field traces may go wrong -> throws an exception */
+class FieldTrace_SizeMismatch { };
+class FieldTrace_IndexOutOfRange { };
+
 /*!
  * \class FieldTrace
  * \brief Type for time traces of electromagnetic fields.
@@ -105,9 +109,22 @@ public:
      */
     ~FieldTrace();
 
+    /*! Assignment operator which copies all data of another field trace.
+     *  An exception is thrown if the sizes don't match.
+     */
+    FieldTrace & operator=(const FieldTrace &t);
+
+    /*! Set one of the entries of a field trace */
+    void set(int index, ElMagField f);
+    
+    /*! Get one of the sampling definitions
+     *  These are not expected to be changed, so, no setter routines are provoded */
     double get_t0() { return t0; };
     double get_dt() { return dt; };
     int get_N() { return N; };
+    
+    /*! Get the time of one point of the trace */
+    double get_time(int index);
     
 private:
 
