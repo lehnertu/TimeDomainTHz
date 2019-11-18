@@ -21,7 +21,8 @@
 
 #pragma once
 
-#include "vector.h"
+#include "vector.h"         // my own 3D vectors in space
+#include <vector>           // the standard template library
 
 /*!
  * \class ElMagField
@@ -131,7 +132,7 @@ private:
     int N;
     double t0;
     double dt;
-    ElMagField *trace;
+    std::vector<ElMagField> trace;
 
 };
 

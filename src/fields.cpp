@@ -95,12 +95,13 @@ FieldTrace::FieldTrace(double t0_p, double dt_p, int N_p)
     t0 = t0_p;
     dt = dt_p;
     N = N_p;
-    trace = new ElMagField[N];
+    // trace = new ElMagField[N];
+    trace = std::vector<ElMagField>(N,ElMagField(Vector(0.0,0.0,0.0),Vector(0.0,0.0,0.0)));
 }
 
 FieldTrace::~FieldTrace()
 {
-    delete [] trace;
+    // delete [] trace;
 }
 
 FieldTrace & FieldTrace::operator=(const FieldTrace &t)
@@ -118,7 +119,8 @@ FieldTrace & FieldTrace::operator=(const FieldTrace &t)
         {
             t0 = t.t0;
             dt = t.dt;
-            for (int i=0; i<N; i++) trace[i]=t.trace[i];
+            // for (int i=0; i<N; i++) trace[i]=t.trace[i];
+            trace = t.trace;
         }
     }
     return *this;    

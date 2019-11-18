@@ -47,9 +47,9 @@ public:
      *  @param Center center point of the screen
      */
     Screen(
-        int Nx_p, int Ny_p, int Nt_p,
+        int Nx, int Ny, int Nt,
         Vector xVec, Vector yVec,
-        Vector Center_p
+        Vector center
         );
 
     /*! Default destructor:<br>
@@ -67,5 +67,8 @@ private:
     /*! center of the screen */
     Vector Center;
     
+    /* array [Nx][Ny] of FieldTrace */
+    FieldTrace *A;
+
 };
 
