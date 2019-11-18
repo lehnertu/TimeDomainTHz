@@ -37,6 +37,7 @@
 
 #include "global.h"
 #include "fields.h"
+#include "screen.h"
 
 int main(int argc, char* argv[])
 {
@@ -51,7 +52,7 @@ int main(int argc, char* argv[])
     std::cout <<  "lambda = " << lam*1e6 << " µm" << std::endl;
     double zR = Pi*w0*w0/lam;
     std::cout <<  "w0 = " << 1e3*w0 << " mm" << std::endl;
-    std::cout <<  "Rayleigh range = " << zR << " m" << std::endl;
+    std::cout <<  "Rayleigh range = " << zR << " m" << std::endl << std::endl;
     
     // define the peak field
     // electric field amplitude in V/m
@@ -65,12 +66,17 @@ int main(int argc, char* argv[])
         double t = on_axis->get_time(i);
         double osc = cos(2.0*Pi*f*t) * exp(-(t*t)/(2.0*tau*tau));
         on_axis->set(i, peak*osc);
-    }
+    };
     
+    // setup the geometry of the screen
+    Screen *scr = new Screen( 25, 25, 400,
+        Vector(0.05,0.0,0.0), Vector(0.0,0.05,0.0),
+        Vector(0.0,0.0,0.0) );
     
-    FieldTrace t2(0.0, 1.0e-13, 400);
+    // set the field traces for all grid points of the screen
+    scr->set_Trace( 12, 12, *on_axis);
     
-    t2 = *on_axis;
+    // write the screen data to file
     
     return 0;
 }

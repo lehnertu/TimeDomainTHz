@@ -24,6 +24,9 @@
 #include "vector.h"
 #include "fields.h"
 
+/*  Assignments of field traces may go wrong -> throw an exception */
+class Screen_IndexOutOfRange { };
+
 /*!
  * \class Screen
  * \brief rectangular array of electromagnetic field traces
@@ -56,6 +59,9 @@ public:
      */
     ~Screen();
 
+    /*! Set the field trace data for one of the grid cells */
+    void set_Trace(int ix, int iy, FieldTrace trace);
+    
 private:
 
     /*! number of grid cells in each direction */

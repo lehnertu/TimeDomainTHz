@@ -37,3 +37,13 @@ Screen::Screen(
     A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
 }
 
+Screen::~Screen()
+{
+}
+
+void Screen::set_Trace(int ix, int iy, FieldTrace trace)
+{
+    if (ix<0 || ix>=Nx) throw(Screen_IndexOutOfRange());
+    if (iy<0 || iy>=Ny) throw(Screen_IndexOutOfRange());
+    A[ix][iy] = trace;
+}
