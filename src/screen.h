@@ -67,8 +67,10 @@ private:
     /*! center of the screen */
     Vector Center;
     
-    /* array [Nx][Ny] of FieldTrace */
-    FieldTrace *A;
+    /* array [Nx][Ny] of FieldTrace
+     * outer (first) index is Nx
+    */
+    std::vector< std::vector<FieldTrace> > A;
 
 };
 

@@ -32,8 +32,8 @@ Screen::Screen(
     xVec = xVec_p;
     yVec = yVec_p;
     Center = center_p;
-    // A = new FieldTrace[Nx][Ny];
-    // double *B = new double[Nx][Ny];
-    // FieldTrace *C = new FieldTrace(0.0,0.0,Nt_p)[Nx];
+    FieldTrace zero_trace(0.0,0.0,Nt_p);
+    std::vector<FieldTrace> zero_column(Ny, zero_trace);
+    A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
 }
 
