@@ -60,6 +60,7 @@ int main(int argc, char* argv[])
     ElMagField peak = ElMagField(Vector(1.0,0.0,0.0),Vector(0.0,1.0/SpeedOfLight,0.0)) * 2.0e7;
 
     // compute the fields on axis including all time dependencies
+    // this will be the same for all grid points, only field strength varies
     FieldTrace *on_axis = new FieldTrace(0.0, 1.0e-13, 400);
     for (int i=0; i<on_axis->get_N(); i++)
     {
@@ -67,16 +68,42 @@ int main(int argc, char* argv[])
         double osc = cos(2.0*Pi*f*t) * exp(-(t*t)/(2.0*tau*tau));
         on_axis->set(i, peak*osc);
     };
+    Vector dPdA = on_axis->Poynting();
+    std::cout << "Power density on axis = ";
+    std::cout << "(" << dPdA.x << ", " << dPdA.y << ", " << dPdA.z << ")";
+    std::cout << " J/m²" << std::endl;
     
     // setup the geometry of the screen
-    Screen *scr = new Screen( 25, 25, 400,
+    int Nx = 51;
+    int Ny = 51;
+    Screen *scr = new Screen( Nx, Ny, 400,
         Vector(0.05,0.0,0.0), Vector(0.0,0.05,0.0),
         Vector(0.0,0.0,0.0) );
     
     // set the field traces for all grid points of the screen
-    scr->set_Trace( 12, 12, *on_axis);
+    Vector center = scr->get_Center();
+    for (int ix=0; ix<Nx; ix++)
+        for (int iy=0; iy<Ny; iy++)
+        {
+            Vector pos = scr->get_point(ix,iy);
+            double r = (pos-center).norm();
+            double radint = exp(-r*r/(w0*w0));
+            scr->set_Trace(ix,iy, (*on_axis)*radint);
+        };
+    std::cout << "Energy incident on screen = " << scr->totalEnergy() << " J" << std::endl;
     
     // write the screen data to file
-    
+    /*
+    hf = h5py.File('Gaussian_25.h5', 'w')
+    h5p = hf.create_dataset('ObservationPosition', data=pos)
+    h5p.attrs['Nx'] = Nx
+    h5p.attrs['Ny'] = Ny
+    h5f = hf.create_dataset('ElMagField', data=A)
+    h5f.attrs['t0'] = 0.0
+    h5f.attrs['dt'] = dt
+    h5f.attrs['NOTS'] = NOTS
+    hf.close()
+    */
+
     return 0;
 }

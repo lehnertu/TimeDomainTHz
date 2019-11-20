@@ -20,6 +20,7 @@
  * =========================================================================*/
 
 #include "fields.h"
+#include "global.h"
 #include <exception>
 
 // ********** ElMagField **********
@@ -44,6 +45,8 @@ void ElMagField::Zero()
 Vector ElMagField::E() { return vecE; }
 
 Vector ElMagField::B() { return vecB; }
+
+Vector ElMagField::Poynting() { return cross(vecE, vecB) / MuNull; }
 
 ElMagField ElMagField::operator+ (ElMagField other)
 {
@@ -126,6 +129,14 @@ FieldTrace & FieldTrace::operator=(const FieldTrace &t)
     return *this;    
 }
 
+FieldTrace FieldTrace::operator* (double factor)
+{
+    FieldTrace temp = *this;
+    for (int i=0; i<temp.N; i++)
+        trace[i] *= factor;
+    return(temp);
+}
+
 void FieldTrace::set(int index, ElMagField f)
 {
     if (index<0 || index>=N) throw(FieldTrace_IndexOutOfRange());
@@ -136,5 +147,13 @@ double FieldTrace::get_time(int index)
 {
     if (index<0 || index>=N) throw(FieldTrace_IndexOutOfRange());
     return t0+index*dt;
+}
+
+Vector FieldTrace::Poynting()
+{
+    Vector sum(0.0,0.0,0.0);
+    for (int i=0; i<N; i++)
+        sum += trace[i].Poynting();
+    return(sum*dt);
 }
 

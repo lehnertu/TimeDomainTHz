@@ -55,6 +55,9 @@ public:
     /*! Magnetic field report */
     Vector B();
 
+    /* Poynting vector - energy flow density */
+    Vector Poynting();
+    
     /*! Sum of two fields */
     ElMagField operator+ (ElMagField other);
 
@@ -117,6 +120,9 @@ public:
 
     /*! Set one of the entries of a field trace */
     void set(int index, ElMagField f);
+
+    /*! Multiplication of the field with a real factor */
+    FieldTrace operator* (double factor);
     
     /*! Get one of the sampling definitions
      *  These are not expected to be changed, so, no setter routines are provoded */
@@ -126,6 +132,9 @@ public:
     
     /*! Get the time of one point of the trace */
     double get_time(int index);
+    
+    /* Poynting vector - time-integrated energy flow density */
+    Vector Poynting();
     
 private:
 
