@@ -45,11 +45,6 @@ Screen::~Screen()
 {
 }
 
-Vector Screen::get_center()
-{
-    return Center;
-}
-
 Vector Screen::get_point(int ix, int iy)
 {
     return Center + xVec*((double)ix-0.5*(double)Nx) + yVec*((double)iy-0.5*(double)Ny);
@@ -71,6 +66,7 @@ double Screen::totalEnergy()
     return(sum*dA);
 }
 
+/*
 void Screen::writeFieldHDF5()
 {
     herr_t status;
@@ -211,4 +207,4 @@ void Screen::writeFieldHDF5()
     cout << "writing HDF5 done." << endl;
     return;
 }
-
+*/
