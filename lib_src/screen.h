@@ -24,8 +24,14 @@
 #include "vector.h"
 #include "fields.h"
 
+/*  Memory allocation may go wrong -> throw an exception */
+class Screen_MemoryAllocationError { };
 /*  Assignments of field traces may go wrong -> throw an exception */
 class Screen_IndexOutOfRange { };
+/*  Writing an HDF5 file may go wrong -> throw an exception */
+class Screen_FileWriteError { };
+/*  Reading an HDF5 file may go wrong -> throw an exception */
+class Screen_FileReadError { };
 
 /*!
  * \class Screen
@@ -79,6 +85,19 @@ public:
     /*! Total energy of radiation falling on the screen */
     double totalEnergy();
     
+    /*! Determine the size of a buffer needed to hold the data array
+     *  @return number of doubles
+     */
+    int getBufferSize() { return Nx*Ny*A[0][0].get_N()*6; }
+    
+    /*! Copy the data array into a given buffer.
+     *  The size of the buffer has to be as determined by getBufferSize().
+     */
+    void bufferArray(double *buffer);
+    
+    /*! Write the screen data to an HDF5 file */
+    void writeFieldHDF5(std::string filename);
+
 private:
 
     /*! number of grid cells in each direction */

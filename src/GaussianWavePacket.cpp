@@ -93,6 +93,7 @@ int main(int argc, char* argv[])
     std::cout << "Energy incident on screen = " << scr->totalEnergy() << " J" << std::endl;
     
     // write the screen data to file
+    scr->writeFieldHDF5("Gaussian_25.h5");
     /*
     hf = h5py.File('Gaussian_25.h5', 'w')
     h5p = hf.create_dataset('ObservationPosition', data=pos)
@@ -105,5 +106,8 @@ int main(int argc, char* argv[])
     hf.close()
     */
 
+    delete scr;
+    delete on_axis;
+    
     return 0;
 }

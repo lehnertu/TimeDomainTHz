@@ -149,6 +149,12 @@ double FieldTrace::get_time(int index)
     return t0+index*dt;
 }
 
+ElMagField FieldTrace::get_field(int index)
+{
+    if (index<0 || index>=N) throw(FieldTrace_IndexOutOfRange());
+    return trace[index];
+}
+
 Vector FieldTrace::Poynting()
 {
     Vector sum(0.0,0.0,0.0);

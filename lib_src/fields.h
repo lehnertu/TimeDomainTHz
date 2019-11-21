@@ -133,6 +133,9 @@ public:
     /*! Get the time of one point of the trace */
     double get_time(int index);
     
+    /*! Get the field at one point of the trace */
+    ElMagField get_field(int index);
+    
     /* Poynting vector - time-integrated energy flow density */
     Vector Poynting();
     
