@@ -19,8 +19,6 @@
  * 
  * =========================================================================*/
 
-#include <iostream>
-
 #include "screen.h"
 #include "hdf5.h"
 
@@ -49,7 +47,7 @@ Screen::~Screen()
 
 Vector Screen::get_point(int ix, int iy)
 {
-    return Center + xVec*((double)ix-0.5*(double)Nx) + yVec*((double)iy-0.5*(double)Ny);
+    return Center + xVec*((double)ix-0.5*((double)Nx-1.0)) + yVec*((double)iy-0.5*((double)Ny-1.0));
 }
 
 void Screen::set_Trace(int ix, int iy, FieldTrace trace)
@@ -64,8 +62,39 @@ double Screen::totalEnergy()
     double sum = 0.0;
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
-            sum += dot(A[ix][iy].Poynting(),Normal);
+            sum += -dot(A[ix][iy].Poynting(),Normal);
     return(sum*dA);
+}
+
+void Screen::writeReport(std::ostream *st)
+{
+    *st << "TimeDomainTHz - Screen" << std::endl << std::endl;
+    *st << "Nx=" << Nx << "  Ny=" << Ny << std::endl;
+    st->precision(4);
+    *st << "e_x = (" << xVec.x*1.0e3 << ", " << xVec.y*1.0e3 << ", " << xVec.z*1.0e3 << ") mm" << std::endl;
+    *st << "e_y = (" << yVec.x*1.0e3 << ", " << yVec.y*1.0e3 << ", " << yVec.z*1.0e3 << ") mm" << std::endl;
+    *st << "n   = (" << Normal.x << ", " << Normal.y << ", " << Normal.z << ")" << std::endl;
+    st->precision(4);
+    *st << "dA  = " << dA*1.0e6 << " mm²" << std::endl << std::endl;
+    double pp=0.0;
+    Vector Sp;
+    int pix=-1;
+    int piy=-1;
+    for (int ix=0; ix<Nx; ix++)
+        for (int iy=0; iy<Ny; iy++)
+        {   
+            Vector p=A[ix][iy].Poynting();
+            if (p.norm()>pp)
+            {
+                Sp = p;
+                pp = p.norm();
+                pix=ix;
+                piy=iy;
+            }
+        }
+    st->precision(6);
+    *st << "peak energy density (" << pix << ", " << piy << ") = " << pp << " J/m²" << std::endl;
+    *st << "Energy incident on screen = " << totalEnergy()*1.0e6 << " µJ" << std::endl << std::endl;
 }
 
 void Screen::bufferArray(double *buffer)

@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <iostream>
+
 #include "vector.h"
 #include "fields.h"
 
@@ -84,6 +86,12 @@ public:
     
     /*! Total energy of radiation falling on the screen */
     double totalEnergy();
+    
+    /*! Write a report of the screen geometry and parameters
+     *  including some summary field data
+     *  onto an output stream
+     */
+    void writeReport(std::ostream *st);
     
     /*! Determine the size of a buffer needed to hold the data array
      *  @return number of doubles

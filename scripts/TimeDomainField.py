@@ -28,7 +28,7 @@ class TimeDomainField:
         self.dY = np.linalg.norm(self.dyVec)
         # this is the backward normal assuming z-direction beam propagation
         # x-left  y-up  z-forward
-        self.normal = -np.cross(self.dxVec,self.dyVec)
+        self.normal = np.cross(self.dxVec,self.dyVec)
         self.normal = self.normal / np.linalg.norm(self.normal)
         f = hdf['ElMagField']
         self.t0 = f.attrs.get('t0')

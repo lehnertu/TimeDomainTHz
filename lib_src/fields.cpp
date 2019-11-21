@@ -133,7 +133,7 @@ FieldTrace FieldTrace::operator* (double factor)
 {
     FieldTrace temp = *this;
     for (int i=0; i<temp.N; i++)
-        trace[i] *= factor;
+        temp.trace[i] *= factor;
     return(temp);
 }
 

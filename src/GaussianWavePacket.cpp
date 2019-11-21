@@ -28,6 +28,11 @@
     
     Create a time-domain field of a Gaussian wave-packet on a screen.
     Save as an HDF5 file.
+    
+    The beam is propagating in positive z-direction.
+    Polarization of the electric field is horizontal (x-direction).
+    The orientation vectors of the screen are positive x (right)
+    and negative y direction (up) so the normal vector is negative z-direction.
 */
 
 #include <stdio.h>
@@ -61,7 +66,7 @@ int main(int argc, char* argv[])
 
     // compute the fields on axis including all time dependencies
     // this will be the same for all grid points, only field strength varies
-    FieldTrace *on_axis = new FieldTrace(0.0, 1.0e-13, 400);
+    FieldTrace *on_axis = new FieldTrace(-200*1.0e-13, 1.0e-13, 400);
     for (int i=0; i<on_axis->get_N(); i++)
     {
         double t = on_axis->get_time(i);
@@ -71,13 +76,13 @@ int main(int argc, char* argv[])
     Vector dPdA = on_axis->Poynting();
     std::cout << "Power density on axis = ";
     std::cout << "(" << dPdA.x << ", " << dPdA.y << ", " << dPdA.z << ")";
-    std::cout << " J/m²" << std::endl;
+    std::cout << " J/m²" << std::endl << std::endl;
     
     // setup the geometry of the screen
     int Nx = 51;
     int Ny = 51;
     Screen *scr = new Screen( Nx, Ny, 400,
-        Vector(0.05,0.0,0.0), Vector(0.0,0.05,0.0),
+        Vector(0.002,0.0,0.0), Vector(0.0,-0.002,0.0),
         Vector(0.0,0.0,0.0) );
     
     // set the field traces for all grid points of the screen
@@ -90,10 +95,12 @@ int main(int argc, char* argv[])
             double radint = exp(-r*r/(w0*w0));
             scr->set_Trace(ix,iy, (*on_axis)*radint);
         };
-    std::cout << "Energy incident on screen = " << scr->totalEnergy() << " J" << std::endl;
+        
+    // print report
+    scr->writeReport(&cout);
     
     // write the screen data to file
-    scr->writeFieldHDF5("Gaussian_25.h5");
+    scr->writeFieldHDF5("Gaussian_51.h5");
     /*
     hf = h5py.File('Gaussian_25.h5', 'w')
     h5p = hf.create_dataset('ObservationPosition', data=pos)
