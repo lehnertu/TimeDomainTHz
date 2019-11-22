@@ -41,6 +41,93 @@ Screen::Screen(
     A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
 }
 
+Screen::Screen(std::string filename)
+{
+    herr_t status;
+    hid_t attr;
+    cout << "reading HDF5 file " << filename << endl;
+    hid_t file = H5Fopen (filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    if (file<0) throw(Screen_FileReadError());
+    
+    // open the position dataset
+    hid_t pos_dataset = H5Dopen2(file, "ObservationPosition", H5P_DEFAULT);
+    if (pos_dataset<0) throw(Screen_FileReadError());
+    attr = H5Aopen_name(pos_dataset, "Nx");
+    if (attr<0) throw(Screen_FileReadError());
+    status =  H5Aread(attr, H5T_NATIVE_INT, &Nx);
+    if (status<0) throw(Screen_FileReadError());
+    attr = H5Aopen_name(pos_dataset, "Ny");
+    if (attr<0) throw(Screen_FileReadError());
+    status =  H5Aread(attr, H5T_NATIVE_INT, &Ny);
+    if (status<0) throw(Screen_FileReadError());
+    // now we know the size of the dataset - create and fill a buffer
+    Vector *pos = new Vector[Nx*Ny];
+    status = H5Dread (pos_dataset,
+        H5T_NATIVE_DOUBLE, 		// mem type id
+        H5S_ALL, 			    // mem space id
+        H5S_ALL,
+        H5P_DEFAULT,			// data transfer properties
+        pos);
+    if (status<0) throw(Screen_FileReadError());
+    status = H5Dclose(pos_dataset);
+    if (status<0) throw(Screen_FileReadError());
+    // analyze the data
+    Vector pos00 = pos[0];
+    Vector pos01 = pos[Ny-1];
+    Vector pos10 = pos[(Nx-1)*Ny];
+    Vector pos11 = pos[(Nx-1)*Ny+Ny-1];
+    xVec = (pos10-pos00)/(double)(Nx-1);
+    yVec = (pos01-pos00)/(double)(Ny-1);
+    Normal = cross(xVec,yVec);
+    dA = Normal.norm();
+    Normal.normalize();
+    Center = (pos11+pos00)*0.5;
+    delete pos;
+
+    // open the field dataset
+    hid_t field_dataset = H5Dopen2(file, "ElMagField", H5P_DEFAULT);
+    if (field_dataset<0) throw(Screen_FileReadError());
+    int Nt;
+    attr = H5Aopen_name(field_dataset, "NOTS");
+    if (attr<0) throw(Screen_FileReadError());
+    status =  H5Aread(attr, H5T_NATIVE_INT, &Nt);
+    if (status<0) throw(Screen_FileReadError());
+    double t0;
+    attr = H5Aopen_name(field_dataset, "t0");
+    if (attr<0) throw(Screen_FileReadError());
+    status =  H5Aread(attr, H5T_NATIVE_DOUBLE, &t0);
+    if (status<0) throw(Screen_FileReadError());
+    double dt;
+    attr = H5Aopen_name(field_dataset, "dt");
+    if (attr<0) throw(Screen_FileReadError());
+    status =  H5Aread(attr, H5T_NATIVE_DOUBLE, &dt);
+    if (status<0) throw(Screen_FileReadError());
+    // now we know the size of the dataset - create and fill a buffer
+    ElMagField *field = new ElMagField[Nx*Ny*Nt];
+    status = H5Dread (field_dataset,
+        H5T_NATIVE_DOUBLE, 		// mem type id
+        H5S_ALL, 			    // mem space id
+        H5S_ALL,
+        H5P_DEFAULT,			// data transfer properties
+        field);
+    // transfer the data into the internal data structures
+    FieldTrace trace(t0, dt, Nt);
+    std::vector<FieldTrace> zero_column(Ny, trace);
+    A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
+    ElMagField *buf = field;
+    for (int ix=0; ix<Nx; ix++)
+        for (int iy=0; iy<Ny; iy++)
+        {   
+            trace.set(buf,Nt);
+            buf += Nt;
+            A[ix][iy] = trace;
+        }
+    delete field;
+    
+    status = H5Fclose (file);
+    if (status<0) throw(Screen_FileReadError());
+}
+
 Screen::~Screen()
 {
 }

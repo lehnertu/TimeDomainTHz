@@ -62,7 +62,10 @@ public:
         Vector xVec, Vector yVec,
         Vector center
         );
-
+        
+    /*! Construct a screen object from an HDF5 file */
+    Screen(std::string filename);
+    
     /*! Default destructor:<br>
      */
     ~Screen();
@@ -81,6 +84,8 @@ public:
     /*! Get the position of one grid cell */
     Vector get_point(int ix, int iy);
     
+    /*! Get/Set the field trace data for one of the grid cells */
+    FieldTrace get_Trace(int ix, int iy) { return A[ix][iy]; }
     /*! Set the field trace data for one of the grid cells */
     void set_Trace(int ix, int iy, FieldTrace trace);
     

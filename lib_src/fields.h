@@ -73,6 +73,9 @@ public:
     /*! Multiplication of the field with a real factor */
     ElMagField operator* (double factor);
 
+    /*! Division of the field by a real factor */
+    ElMagField operator/ (double factor);
+
     /*! In-place multiplication of the field with a real factor */
     ElMagField& operator*= (double factor);
 
@@ -121,6 +124,11 @@ public:
     /*! Set one of the entries of a field trace */
     void set(int index, ElMagField f);
 
+    /*! Set all entries of a field trace from a buffer.
+     *  The number of elements in the buffer needs to be provided for checking.
+     */
+    void set(ElMagField *buffer, int Nb);
+
     /*! Multiplication of the field with a real factor */
     FieldTrace operator* (double factor);
     
@@ -136,8 +144,11 @@ public:
     /*! Get the field at one point of the trace */
     ElMagField get_field(int index);
     
-    /* Poynting vector - time-integrated energy flow density */
+    /*! Poynting vector - time-integrated energy flow density */
     Vector Poynting();
+    
+    /*! compute time derivative of fields */
+    FieldTrace get_derivative();
     
 private:
 

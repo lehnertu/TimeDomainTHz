@@ -101,18 +101,8 @@ int main(int argc, char* argv[])
     
     // write the screen data to file
     scr->writeFieldHDF5("Gaussian_51.h5");
-    /*
-    hf = h5py.File('Gaussian_25.h5', 'w')
-    h5p = hf.create_dataset('ObservationPosition', data=pos)
-    h5p.attrs['Nx'] = Nx
-    h5p.attrs['Ny'] = Ny
-    h5f = hf.create_dataset('ElMagField', data=A)
-    h5f.attrs['t0'] = 0.0
-    h5f.attrs['dt'] = dt
-    h5f.attrs['NOTS'] = NOTS
-    hf.close()
-    */
 
+    // clean up
     delete scr;
     delete on_axis;
     

@@ -86,6 +86,14 @@ ElMagField ElMagField::operator* (double factor)
     return (temp);
 }
 
+ElMagField ElMagField::operator/ (double factor)
+{
+    ElMagField temp;
+    temp.vecE = vecE/factor;
+    temp.vecB = vecB/factor;
+    return (temp);
+}
+
 ElMagField& ElMagField::operator*= (double factor)
 {
     vecE *= factor;
@@ -143,6 +151,13 @@ void FieldTrace::set(int index, ElMagField f)
     trace[index] = f;
 }
 
+void FieldTrace::set(ElMagField *buffer, int Nb)
+{
+    if (Nb != N) throw(FieldTrace_SizeMismatch());
+    ElMagField *buf = buffer;
+    for (int it=0; it<N; it++) set(it, *buf++);
+}
+
 double FieldTrace::get_time(int index)
 {
     if (index<0 || index>=N) throw(FieldTrace_IndexOutOfRange());
@@ -161,5 +176,15 @@ Vector FieldTrace::Poynting()
     for (int i=0; i<N; i++)
         sum += trace[i].Poynting();
     return(sum*dt);
+}
+
+FieldTrace FieldTrace::get_derivative()
+{
+    FieldTrace temp = *this;
+    temp.trace[0] = (trace[1]-trace[0])/dt;
+    for (int i=1; i<temp.N-1; i++)
+        temp.trace[i] = (trace[i+1]-trace[-1])/(2.0*dt);
+    temp.trace[N-1] = (trace[N-1]-trace[N-2])/dt;
+    return(temp);
 }
 
