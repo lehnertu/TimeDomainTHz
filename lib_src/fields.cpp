@@ -101,6 +101,13 @@ ElMagField& ElMagField::operator*= (double factor)
     return (*this);
 }
 
+ElMagField& ElMagField::operator/= (double factor)
+{
+    vecE /= factor;
+    vecB /= factor;
+    return (*this);
+}
+
 FieldTrace::FieldTrace(double t0_p, double dt_p, int N_p)
 {
     t0 = t0_p;
@@ -143,6 +150,36 @@ FieldTrace FieldTrace::operator* (double factor)
     for (int i=0; i<temp.N; i++)
         temp.trace[i] *= factor;
     return(temp);
+}
+
+FieldTrace FieldTrace::operator/ (double factor)
+{
+    FieldTrace temp = *this;
+    for (int i=0; i<temp.N; i++)
+        temp.trace[i] /= factor;
+    return(temp);
+}
+
+FieldTrace FieldTrace::operator+ (FieldTrace other)
+{
+    if (N != other.N) throw(FieldTrace_SizeMismatch());
+    if (t0 != other.t0) throw(FieldTrace_SizeMismatch());
+    if (dt != other.dt) throw(FieldTrace_SizeMismatch());
+    FieldTrace temp = *this;
+    for (int i=0; i<N; i++)
+        temp.trace[i] = trace[i] + other.trace[i];
+    return (temp);
+}
+
+FieldTrace FieldTrace::operator- (FieldTrace other)
+{
+    if (N != other.N) throw(FieldTrace_SizeMismatch());
+    if (t0 != other.t0) throw(FieldTrace_SizeMismatch());
+    if (dt != other.dt) throw(FieldTrace_SizeMismatch());
+    FieldTrace temp = *this;
+    for (int i=0; i<N; i++)
+        temp.trace[i] = trace[i] - other.trace[i];
+    return (temp);
 }
 
 void FieldTrace::set(int index, ElMagField f)

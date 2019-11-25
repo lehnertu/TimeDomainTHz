@@ -79,6 +79,9 @@ public:
     /*! In-place multiplication of the field with a real factor */
     ElMagField& operator*= (double factor);
 
+    /*! in-place division of the field by a real factor */
+    ElMagField& operator/= (double factor);
+
 private:
 
     Vector vecE;
@@ -132,6 +135,19 @@ public:
     /*! Multiplication of the field with a real factor */
     FieldTrace operator* (double factor);
     
+    /*! Division of the field by a real factor */
+    FieldTrace operator/ (double factor);
+    
+    /*! Sum of the fields of two traces.
+     *  An exception is thrown in case of mismatch of the time or size definitions.
+     */
+    FieldTrace operator+ (FieldTrace other);
+
+    /*! Difference of the fields of two traces.
+     *  An exception is thrown in case of mismatch of the time or size definitions.
+     */
+    FieldTrace operator- (FieldTrace other);
+
     /*! Get one of the sampling definitions
      *  These are not expected to be changed, so, no setter routines are provoded */
     double get_t0() { return t0; };

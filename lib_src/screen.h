@@ -107,7 +107,13 @@ public:
      *  The size of the buffer has to be as determined by getBufferSize().
      */
     void bufferArray(double *buffer);
-    
+
+    /*! Compute the spatial and temporal derivatives of the fields
+     *  @TODO The computation is flawed as it assumes orthogonality of xVec and yVec
+     *  when computing the normal derivatives.
+     */    
+    void computeDerivatives();
+
     /*! Write the screen data to an HDF5 file */
     void writeFieldHDF5(std::string filename);
 
@@ -128,10 +134,29 @@ private:
     /*! center of the screen */
     Vector Center;
     
-    /* array [Nx][Ny] of FieldTrace
-     * outer (first) index is Nx
+    /*! array [Nx][Ny] of FieldTrace
+     *  outer (first) index is Nx
     */
     std::vector< std::vector<FieldTrace> > A;
 
+    /*! partial derivative of the fields along the xVec direction
+     *  data are only valid after calling computeDerivatives()
+     */
+    std::vector< std::vector<FieldTrace> > dx_A;
+
+    /*! partial derivative of the fields along the yVec direction
+     *  data are only valid after calling computeDerivatives()
+     */
+    std::vector< std::vector<FieldTrace> > dy_A;
+
+    /*! partial derivative of the fields along the normal direction
+     *  data are only valid after calling computeDerivatives()
+     */
+    std::vector< std::vector<FieldTrace> > dn_A;
+
+    /*! time derivative of the fields
+     *  data are only valid after calling computeDerivatives()
+     */
+    std::vector< std::vector<FieldTrace> > dt_A;
 };
 

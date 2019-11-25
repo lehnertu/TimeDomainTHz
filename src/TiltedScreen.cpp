@@ -58,6 +58,10 @@ int main(int argc, char* argv[])
     Screen *source = new Screen(filename);
     // print report
     source->writeReport(&cout);
+    // compute the derivatives of the source fields
+    std::cout << "computing derivatives of source field..." << std::endl;
+    source->computeDerivatives();
+    std::cout << std::endl;
 
     // define the target screen
     double distance = 1.25751;

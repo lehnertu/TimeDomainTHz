@@ -19,6 +19,7 @@
  * 
  * =========================================================================*/
 
+#include "global.h"
 #include "screen.h"
 #include "hdf5.h"
 
@@ -39,6 +40,10 @@ Screen::Screen(
     FieldTrace zero_trace(0.0,0.0,Nt_p);
     std::vector<FieldTrace> zero_column(Ny, zero_trace);
     A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
+    dx_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
+    dy_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
+    dn_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
+    dt_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
 }
 
 Screen::Screen(std::string filename)
@@ -126,6 +131,10 @@ Screen::Screen(std::string filename)
     
     status = H5Fclose (file);
     if (status<0) throw(Screen_FileReadError());
+    dx_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
+    dy_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
+    dn_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
+    dt_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
 }
 
 Screen::~Screen()
@@ -204,6 +213,151 @@ void Screen::bufferArray(double *buffer)
                 *bp++ = field.B().z;
             };
         }
+}
+
+void Screen::computeDerivatives()
+{
+    double dX = xVec.norm();
+    double dY = yVec.norm();
+    // compute the x-derivatives
+    for (int iy=0; iy<Ny; iy++)
+    {
+        dx_A[0][iy] = (A[1][iy] - A[0][iy]) / dX;
+        for (int ix=1; ix<Nx-1; ix++)
+            dx_A[ix][iy] = (A[ix+1][iy] - A[ix-1][iy]) / (dX*2.0);
+        dx_A[Nx-1][iy] = (A[Nx-1][iy] - A[Nx-2][iy]) / dX;
+    }
+    // compute the y-derivatives
+    for (int ix=0; ix<Nx; ix++)
+    {
+        dy_A[ix][0] = (A[ix][1] - A[ix][0]) / dY;
+        for (int iy=1; iy<Ny-1; iy++)
+            dx_A[ix][iy] = (A[ix][iy+1] - A[ix][iy-1]) / (dY*2.0);
+        dx_A[ix][Ny-1] = (A[ix][Ny-1] - A[ix][Ny-2]) / dY;
+    }
+    // compute the time-derivatives for all traces
+    for (int ix=0; ix<Nx; ix++)
+        for (int iy=0; iy<Ny; iy++)
+            dt_A[ix][iy] = A[ix][iy].get_derivative();
+    // compute the normal derivatives using the Maxwell equations
+    int Nt = A[0][0].get_N();
+    FieldTrace trace(0.0,0.0,Nt);
+    double *pEx, *pEy, *pEz, *pBx, *pBy, *pBz;
+    double *dx_Ex = new double[Nx*Ny*Nt];
+    pEx = dx_Ex;
+    double *dx_Ez = new double[Nx*Ny*Nt];
+    pEz = dx_Ez;
+    double *dx_Bx = new double[Nx*Ny*Nt];
+    pBx = dx_Bx;
+    double *dx_Bz = new double[Nx*Ny*Nt];
+    pBz = dx_Bz;
+    for (int ix=0; ix<Nx; ix++)
+        for (int iy=0; iy<Ny; iy++)
+        {
+            trace = dx_A[ix][iy];
+            for (int it=0; it<Nt; it++)
+            {
+                ElMagField f = trace.get_field(it);
+                *pEx++ = f.E().x;
+                *pEz++ = f.E().z;
+                *pBx++ = f.B().x;
+                *pBz++ = f.B().z;
+            }
+        };
+    double *dy_Ey = new double[Nx*Ny*Nt];
+    pEy = dy_Ey;
+    double *dy_Ez = new double[Nx*Ny*Nt];
+    pEz = dy_Ez;
+    double *dy_By = new double[Nx*Ny*Nt];
+    pBy = dy_By;
+    double *dy_Bz = new double[Nx*Ny*Nt];
+    pBz = dy_Bz;
+    for (int ix=0; ix<Nx; ix++)
+        for (int iy=0; iy<Ny; iy++)
+        {
+            trace = dy_A[ix][iy];
+            for (int it=0; it<Nt; it++)
+            {
+                ElMagField f = trace.get_field(it);
+                *pEy++ = f.E().y;
+                *pEz++ = f.E().z;
+                *pBy++ = f.B().y;
+                *pBz++ = f.B().z;
+            }
+        };
+    double *dt_Ex = new double[Nx*Ny*Nt];
+    pEx = dt_Ex;
+    double *dt_Ey = new double[Nx*Ny*Nt];
+    pEy = dt_Ey;
+    double *dt_Bx = new double[Nx*Ny*Nt];
+    pBx = dt_Bx;
+    double *dt_By = new double[Nx*Ny*Nt];
+    pBy = dt_By;
+    for (int ix=0; ix<Nx; ix++)
+        for (int iy=0; iy<Ny; iy++)
+        {
+            trace = dt_A[ix][iy];
+            for (int it=0; it<Nt; it++)
+            {
+                ElMagField f = trace.get_field(it);
+                *pEx++ = f.E().x;
+                *pEy++ = f.E().y;
+                *pBx++ = f.B().x;
+                *pBy++ = f.B().y;
+            }
+        };
+    double *dn_Ex = new double[Nx*Ny*Nt];
+    double *dn_Ey = new double[Nx*Ny*Nt];
+    double *dn_Ez = new double[Nx*Ny*Nt];
+    double *dn_Bx = new double[Nx*Ny*Nt];
+    double *dn_By = new double[Nx*Ny*Nt];
+    double *dn_Bz = new double[Nx*Ny*Nt];
+    double cSquared = SpeedOfLight*SpeedOfLight;
+    for (int i=0; i<Nx*Ny*Nt; i++)
+    {
+        dn_Ex[i] = dx_Ez[i] - dt_By[i];
+        dn_Ey[i] = dy_Ez[i] + dt_Bx[i];
+        dn_Ez[i] = -dx_Ex[i] - dy_Ey[i];
+        dn_Bx[i] = dx_Bz[i] + dt_Ey[i]/cSquared;
+        dn_By[i] = dy_Bz[i] - dt_Ex[i]/cSquared;
+        dn_Bz[i] = -dx_Bx[i] - dy_By[i];
+    };
+    pEx = dn_Ex;
+    pEy = dn_Ey;
+    pEz = dn_Ez;
+    pBx = dn_Bx;
+    pBy = dn_By;
+    pBz = dn_Bz;
+    for (int ix=0; ix<Nx; ix++)
+        for (int iy=0; iy<Ny; iy++)
+        {
+            for (int it=0; it<Nt; it++)
+            {
+                Vector E = Vector(*pEx++,*pEy++,*pEz++);
+                Vector B = Vector(*pBx++,*pBy++,*pBz++);
+                ElMagField f = ElMagField(E,B);
+                trace.set(it,f);
+            }
+            dn_A[ix][iy] = trace;
+        };
+    delete dx_Ex;
+    delete dx_Ez;
+    delete dx_Bx;
+    delete dx_Bz;
+    delete dy_Ey;
+    delete dy_Ez;
+    delete dy_By;
+    delete dy_Bz;
+    delete dt_Ex;
+    delete dt_Ey;
+    delete dt_Bx;
+    delete dt_By;
+    delete dn_Ex;
+    delete dn_Ey;
+    delete dn_Ez;
+    delete dn_Bx;
+    delete dn_By;
+    delete dn_Bz;
 }
 
 void Screen::writeFieldHDF5(std::string filename)
