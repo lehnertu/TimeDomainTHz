@@ -241,7 +241,7 @@ void Screen::computeDerivatives()
     // compute the time-derivatives for all traces
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
-            dt_A[ix][iy] = A[ix][iy].get_derivative();
+            dt_A[ix][iy] = A[ix][iy].derivative();
     // compute the normal derivatives using the Maxwell equations
     int Nt = A[0][0].get_N();
     FieldTrace trace(0.0,0.0,Nt);
@@ -361,6 +361,31 @@ void Screen::computeDerivatives()
     delete dz_Bx;
     delete dz_By;
     delete dz_Bz;
+}
+
+FieldTrace Screen::propagation(Vector target, double t0_p, int N_p)
+{
+    double dt = A[0][0].get_dt();
+    FieldTrace trace(t0_p, dt, N_p);
+    for (int ix=0; ix<Nx; ix++)
+        for (int iy=0; iy<Ny; iy++)
+        {
+            Vector source = get_point(ix,iy);
+            Vector RVec = target-source;
+            double R = RVec.norm();
+            double R2 = R*R;
+            double R3 = R2*R;
+            FieldTrace t1 = A[ix][iy];
+            FieldTrace t2 = t1.retarded(R/SpeedOfLight, t0_p, N_p);
+            trace += t2 * (dot(RVec,Normal)/R3);
+            t1 = dt_A[ix][iy];
+            t2 = t1.retarded(R/SpeedOfLight, t0_p, N_p);
+            trace += t2 * (dot(RVec,Normal)/(R2*SpeedOfLight));
+            t1 = dn_A[ix][iy];
+            t2 = t1.retarded(R/SpeedOfLight, t0_p, N_p);
+            trace += t2 * (-1.0/R);
+        }    
+    return(trace * dA/(4.0*Pi));
 }
 
 void Screen::writeFieldHDF5(std::string filename)

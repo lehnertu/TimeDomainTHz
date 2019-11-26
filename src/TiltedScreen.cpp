@@ -69,17 +69,39 @@ int main(int argc, char* argv[])
 
     // define the target screen
     double distance = 1.25751;
-    int Nx = 25;
-    int Ny = 25;
+    int Nx = 51;
+    int Ny = 51;
     FieldTrace source_trace = source->get_Trace(0,0);
     int Nt = source_trace.get_N()+400;
     Screen *target = new Screen(
         Nx, Ny, Nt,
-        Vector(0.005,0.0,0.0),
-        Vector(0.0,-0.005,0.0),
+        Vector(0.002,0.0,0.0),
+        Vector(0.0,-0.002,0.0),
         source->get_Center() + Vector(0.0,0.0,distance) );
     target->writeReport(&cout);
 
+    // compute the source beam propagated to the target screen
+    std::cout << "computing propagated source fields ..." << std::endl;
+    double target_t0 = source->get_t0()+distance/SpeedOfLight;
+    for (int ix=0; ix<Nx; ix++)
+    {
+        for (int iy=0; iy<Ny; iy++)
+        {
+            Vector pos = target->get_point(ix,iy);
+            FieldTrace target_trace = source->propagation(pos, target_t0, Nt);
+            target->set_Trace(ix, iy, target_trace);
+            std::cout << iy << " ";
+        };
+        std::cout << ix << std::endl;
+    };
+    std::cout << "done." << std::endl;
+    std::cout << std::endl;
+
+    // write the target screen data to file
+    target->writeFieldHDF5("Mirror_25.h5");
+    
     delete source;
+    delete target;
+    
     return 0;
 }

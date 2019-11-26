@@ -92,6 +92,7 @@ private:
 /*  Assignments of field traces may go wrong -> throws an exception */
 class FieldTrace_SizeMismatch { };
 class FieldTrace_IndexOutOfRange { };
+class FieldTrace_Zero { };
 
 /*!
  * \class FieldTrace
@@ -143,6 +144,11 @@ public:
      */
     FieldTrace operator+ (FieldTrace other);
 
+    /*! Accumulating sum of the fields of two traces.
+     *  An exception is thrown in case of mismatch of the time or size definitions.
+     */
+    FieldTrace& operator+= (FieldTrace other);
+
     /*! Difference of the fields of two traces.
      *  An exception is thrown in case of mismatch of the time or size definitions.
      */
@@ -160,12 +166,26 @@ public:
     /*! Get the field at one point of the trace */
     ElMagField get_field(int index);
     
+    /*! Get the field at one point in time.
+        This interpolates linearly between samples.
+        Outside the covered trace length zero is returned.
+     */
+    ElMagField get_field(double time);
+    
     /*! Poynting vector - time-integrated energy flow density */
     Vector Poynting();
     
     /*! compute time derivative of fields */
-    FieldTrace get_derivative();
+    FieldTrace derivative();
     
+    /*! compute a retarded trace
+     *  @param delta_t - the amount of retardation in seconds
+     *  @param t0_p - start time of the new trace in seconds
+     *  @param N_p - length of the new trace
+     *  the time step remains the same
+     */
+    FieldTrace retarded(double delta_t, double t0_p, int N_p);
+
 private:
 
     int N;

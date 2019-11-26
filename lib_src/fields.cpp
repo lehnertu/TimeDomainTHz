@@ -22,6 +22,8 @@
 #include "fields.h"
 #include "global.h"
 #include <exception>
+#include <math.h>
+#include <iostream>
 
 // ********** ElMagField **********
 
@@ -108,12 +110,15 @@ ElMagField& ElMagField::operator/= (double factor)
     return (*this);
 }
 
+// ========================================================
+//    FieldTrace methods
+// ========================================================
+
 FieldTrace::FieldTrace(double t0_p, double dt_p, int N_p)
 {
     t0 = t0_p;
     dt = dt_p;
     N = N_p;
-    // trace = new ElMagField[N];
     trace = std::vector<ElMagField>(N,ElMagField(Vector(0.0,0.0,0.0),Vector(0.0,0.0,0.0)));
 }
 
@@ -171,6 +176,16 @@ FieldTrace FieldTrace::operator+ (FieldTrace other)
     return (temp);
 }
 
+FieldTrace& FieldTrace::operator+= (FieldTrace other)
+{
+    if (N != other.N) throw(FieldTrace_SizeMismatch());
+    if (t0 != other.t0) throw(FieldTrace_SizeMismatch());
+    if (dt != other.dt) throw(FieldTrace_SizeMismatch());
+    for (int i=0; i<N; i++)
+        trace[i] += other.trace[i];
+    return (*this);
+}
+
 FieldTrace FieldTrace::operator- (FieldTrace other)
 {
     if (N != other.N) throw(FieldTrace_SizeMismatch());
@@ -207,6 +222,18 @@ ElMagField FieldTrace::get_field(int index)
     return trace[index];
 }
 
+ElMagField FieldTrace::get_field(double time)
+{
+    double ref = (time-t0)/dt;
+    int index = (int)floor(ref);
+    double frac = ref-(double)index;
+    ElMagField f1(Vector(0.0,0.0,0.0),Vector(0.0,0.0,0.0));
+    if ((index>=0) && (index<N)) f1=trace[index];
+    ElMagField f2(Vector(0.0,0.0,0.0),Vector(0.0,0.0,0.0));
+    if ((index+1>=0) && (index+1<N)) f2=trace[index+1];
+    return(f1*(1.0-frac)+f2*frac);
+}
+
 Vector FieldTrace::Poynting()
 {
     Vector sum(0.0,0.0,0.0);
@@ -215,7 +242,7 @@ Vector FieldTrace::Poynting()
     return(sum*dt);
 }
 
-FieldTrace FieldTrace::get_derivative()
+FieldTrace FieldTrace::derivative()
 {
     FieldTrace temp = *this;
     temp.trace[0] = (trace[1]-trace[0])/dt;
@@ -223,5 +250,22 @@ FieldTrace FieldTrace::get_derivative()
         temp.trace[i] = (trace[i+1]-trace[i-1])/(2.0*dt);
     temp.trace[N-1] = (trace[N-1]-trace[N-2])/dt;
     return(temp);
+}
+
+FieldTrace FieldTrace::retarded(double delta_t, double t0_p, int N_p)
+{
+    FieldTrace ret(t0_p, dt, N_p);
+    for (int i=0; i<N_p; i++)
+    {
+        double t = ret.get_time(i) - delta_t;
+        ret.set(i,get_field(t));
+    };
+    if (ret.Poynting().norm()==0.0)
+    {
+        std::cout << "retard t0=" << t0 << " N=" << N << " P=" << Poynting().norm() << std::endl;
+        std::cout << "t0 t0=" << ret.get_t0() << " N=" << ret.get_N()<< " P=" << ret.Poynting().norm() << std::endl;
+        throw(FieldTrace_Zero());
+    };
+    return(ret);
 }
 
