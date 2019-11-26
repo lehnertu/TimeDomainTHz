@@ -202,6 +202,9 @@ void Screen::bufferArray(double *buffer)
         for (int iy=0; iy<Ny; iy++)
         {
             trace = A[ix][iy];
+            // for testing purposes this line can be replaced like
+            // trace = dx_A[ix][iy];
+            // then the computed derivative is written to an output file instead of the field
             for (int it=0; it<Nt; it++)
             {
                 ElMagField field = trace.get_field(it);
@@ -232,8 +235,8 @@ void Screen::computeDerivatives()
     {
         dy_A[ix][0] = (A[ix][1] - A[ix][0]) / dY;
         for (int iy=1; iy<Ny-1; iy++)
-            dx_A[ix][iy] = (A[ix][iy+1] - A[ix][iy-1]) / (dY*2.0);
-        dx_A[ix][Ny-1] = (A[ix][Ny-1] - A[ix][Ny-2]) / dY;
+            dy_A[ix][iy] = (A[ix][iy+1] - A[ix][iy-1]) / (dY*2.0);
+        dy_A[ix][Ny-1] = (A[ix][Ny-1] - A[ix][Ny-2]) / dY;
     }
     // compute the time-derivatives for all traces
     for (int ix=0; ix<Nx; ix++)
@@ -306,28 +309,28 @@ void Screen::computeDerivatives()
                 *pBy++ = f.B().y;
             }
         };
-    double *dn_Ex = new double[Nx*Ny*Nt];
-    double *dn_Ey = new double[Nx*Ny*Nt];
-    double *dn_Ez = new double[Nx*Ny*Nt];
-    double *dn_Bx = new double[Nx*Ny*Nt];
-    double *dn_By = new double[Nx*Ny*Nt];
-    double *dn_Bz = new double[Nx*Ny*Nt];
+    double *dz_Ex = new double[Nx*Ny*Nt];
+    double *dz_Ey = new double[Nx*Ny*Nt];
+    double *dz_Ez = new double[Nx*Ny*Nt];
+    double *dz_Bx = new double[Nx*Ny*Nt];
+    double *dz_By = new double[Nx*Ny*Nt];
+    double *dz_Bz = new double[Nx*Ny*Nt];
     double cSquared = SpeedOfLight*SpeedOfLight;
     for (int i=0; i<Nx*Ny*Nt; i++)
     {
-        dn_Ex[i] = dx_Ez[i] - dt_By[i];
-        dn_Ey[i] = dy_Ez[i] + dt_Bx[i];
-        dn_Ez[i] = -dx_Ex[i] - dy_Ey[i];
-        dn_Bx[i] = dx_Bz[i] + dt_Ey[i]/cSquared;
-        dn_By[i] = dy_Bz[i] - dt_Ex[i]/cSquared;
-        dn_Bz[i] = -dx_Bx[i] - dy_By[i];
+        dz_Ex[i] = dx_Ez[i] - dt_By[i];
+        dz_Ey[i] = dy_Ez[i] + dt_Bx[i];
+        dz_Ez[i] = -dx_Ex[i] - dy_Ey[i];
+        dz_Bx[i] = dx_Bz[i] + dt_Ey[i]/cSquared;
+        dz_By[i] = dy_Bz[i] - dt_Ex[i]/cSquared;
+        dz_Bz[i] = -dx_Bx[i] - dy_By[i];
     };
-    pEx = dn_Ex;
-    pEy = dn_Ey;
-    pEz = dn_Ez;
-    pBx = dn_Bx;
-    pBy = dn_By;
-    pBz = dn_Bz;
+    pEx = dz_Ex;
+    pEy = dz_Ey;
+    pEz = dz_Ez;
+    pBx = dz_Bx;
+    pBy = dz_By;
+    pBz = dz_Bz;
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {
@@ -338,7 +341,7 @@ void Screen::computeDerivatives()
                 ElMagField f = ElMagField(E,B);
                 trace.set(it,f);
             }
-            dn_A[ix][iy] = trace;
+            dn_A[ix][iy] = trace*(-1.0);
         };
     delete dx_Ex;
     delete dx_Ez;
@@ -352,12 +355,12 @@ void Screen::computeDerivatives()
     delete dt_Ey;
     delete dt_Bx;
     delete dt_By;
-    delete dn_Ex;
-    delete dn_Ey;
-    delete dn_Ez;
-    delete dn_Bx;
-    delete dn_By;
-    delete dn_Bz;
+    delete dz_Ex;
+    delete dz_Ey;
+    delete dz_Ez;
+    delete dz_Bx;
+    delete dz_By;
+    delete dz_Bz;
 }
 
 void Screen::writeFieldHDF5(std::string filename)

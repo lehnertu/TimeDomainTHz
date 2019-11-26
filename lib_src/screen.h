@@ -111,6 +111,9 @@ public:
     /*! Compute the spatial and temporal derivatives of the fields
      *  @TODO The computation is flawed as it assumes orthogonality of xVec and yVec
      *  when computing the normal derivatives.
+     *  Signs of the drivatives have been checked to match those of the python code.
+     *  This may be wrong, in particular for dy_A (because yVec is -ey in the test case)
+     *  and dn_A should be dz_A but is set to -dz_A.
      */    
     void computeDerivatives();
 

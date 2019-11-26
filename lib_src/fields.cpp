@@ -219,8 +219,8 @@ FieldTrace FieldTrace::get_derivative()
 {
     FieldTrace temp = *this;
     temp.trace[0] = (trace[1]-trace[0])/dt;
-    for (int i=1; i<temp.N-1; i++)
-        temp.trace[i] = (trace[i+1]-trace[-1])/(2.0*dt);
+    for (int i=1; i<N-1; i++)
+        temp.trace[i] = (trace[i+1]-trace[i-1])/(2.0*dt);
     temp.trace[N-1] = (trace[N-1]-trace[N-2])/dt;
     return(temp);
 }

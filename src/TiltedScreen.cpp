@@ -62,6 +62,10 @@ int main(int argc, char* argv[])
     std::cout << "computing derivatives of source field..." << std::endl;
     source->computeDerivatives();
     std::cout << std::endl;
+    // write the screen data to file
+    // with modified sources we write the derivatives insted
+    // Screen::bufferArray() is changed to deliver dx_A instead of A
+    // source->writeFieldHDF5("Gaussian_51_dx.h5");
 
     // define the target screen
     double distance = 1.25751;
