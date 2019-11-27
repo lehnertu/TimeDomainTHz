@@ -260,12 +260,14 @@ FieldTrace FieldTrace::retarded(double delta_t, double t0_p, int N_p)
         double t = ret.get_time(i) - delta_t;
         ret.set(i,get_field(t));
     };
+    /*
     if (ret.Poynting().norm()==0.0)
     {
         std::cout << "retard t0=" << t0 << " N=" << N << " P=" << Poynting().norm() << std::endl;
-        std::cout << "t0 t0=" << ret.get_t0() << " N=" << ret.get_N()<< " P=" << ret.Poynting().norm() << std::endl;
+        std::cout << "to     t0=" << ret.get_t0() << " N=" << ret.get_N()<< " P=" << ret.Poynting().norm() << std::endl;
         throw(FieldTrace_Zero());
     };
+    */
     return(ret);
 }
 

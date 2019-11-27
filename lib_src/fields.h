@@ -182,7 +182,10 @@ public:
      *  @param delta_t - the amount of retardation in seconds
      *  @param t0_p - start time of the new trace in seconds
      *  @param N_p - length of the new trace
-     *  the time step remains the same
+     *  The time step remains the same.
+     *  This method thrown an exception if the returned field trace has zero radiation intensity.
+     *  This is usually an indication that the time frame of the retarded trace does
+     *  not overlap with the retarded source fields.
      */
     FieldTrace retarded(double delta_t, double t0_p, int N_p);
 

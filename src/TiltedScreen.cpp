@@ -69,50 +69,76 @@ int main(int argc, char* argv[])
     // Screen::bufferArray() is changed to deliver dx_A instead of A
     // source->writeFieldHDF5("Gaussian_51_dx.h5");
 
+    // The target screen is angled 45 degrees to the beam incidence (z axis).
+    // It reflects the beam from z propagation direction to x.
+    
+    // The taget screen has to resolve the wavelength - the pixel spacing
+    // in x/z direction should be less than 1/20 of the wavelength
+    // lambda=1mm => 0.05mm  in this case
+    
+    // The target screen total size is 100x100mm in the projection giving 140mm in the tilted plane.
+    // The length of the time trace has to be increased to accomodate the
+    // 50mm = 170ps = 1700*dt  difference of arrival times center to edge
+    
     // define the target screen
     double distance = 1.25751;
-    int Nx = 25;
+    int Nx = 201;
     int Ny = 25;
     FieldTrace source_trace = source->get_Trace(0,0);
-    int Nt = source_trace.get_N()+400;
+    int Nt = source_trace.get_N()+4000;
     Screen *target = new Screen(
         Nx, Ny, Nt,
-        Vector(0.002,0.0,0.0),
-        Vector(0.0,-0.002,0.0),
+        Vector(0.0005,0.0,0.0005),
+        Vector(0.0,-0.004,0.0),
         source->get_Center() + Vector(0.0,0.0,distance) );
     target->writeReport(&cout);
 
     // compute the source beam propagated to the target screen
-    std::cout << "running on " << omp_get_max_threads() << " parallel threads" << std::endl;
-    std::cout << "computing propagated source fields ..." << std::endl;
-    double target_t0 = source->get_t0()+distance/SpeedOfLight;
-    time_t start_t, end_t;
+    double target_t0 = source->get_t0()+distance/SpeedOfLight-source->get_dt()*2000;
+    time_t start_t;
     time(&start_t);
+    time_t print_time = start_t;
+    time_t now;
     // parallel domain
     // all variables declared outside this block are shared, e.g. source, target
     // all variables declared inside this block are private, e.g. pos, target_trace
     #pragma omp parallel
     {
-        #pragma omp parallel for
-        for (int ix=0; ix<Nx; ix++)
+        #pragma omp single
         {
-            for (int iy=0; iy<Ny; iy++)
+            std::cout << "computing propagated source fields on " << omp_get_num_threads() << " parallel threads" << std::endl;
+        }
+        #pragma omp for
+        for (int i=0; i<Nx*Ny; i++)
+        {
+            // we comprise the two loops over ix and iy into one parallel loop
+            int ix = i/Ny;
+            int iy = i - ix*Ny;
+            /* pragma omp critical
             {
-                Vector pos = target->get_point(ix,iy);
-                FieldTrace target_trace = source->propagation(pos, target_t0, Nt);
-                target->set_Trace(ix, iy, target_trace);
-                // std::cout << iy << " ";
+                std::cout << "ix = " << ix << "  iy = " << iy << std::endl;
             };
-            // std::cout << ix << std::endl;
+            */
+            Vector pos = target->get_point(ix,iy);
+            FieldTrace target_trace = source->propagation(pos, target_t0, Nt);
+            target->set_Trace(ix, iy, target_trace);
+            // only the master thread keeps the time
+            if (omp_get_thread_num()==0)
+            {
+                time(&now);
+                if (difftime(now, print_time)>10.0)
+                    std::cout << "completed " << 100.0*(double)i/(double)(Nx*Ny) << "%" << std::endl;
+            };
         };
-    }
+    };
     // end parallel domain
-    time(&end_t);
-    std::cout << "completed after " << difftime(end_t, start_t) << "seconds." << std::endl;
+    time(&now);
+    std::cout << "completed after " << difftime(now, start_t) << "seconds." << std::endl;
     std::cout << std::endl;
+    target->writeReport(&cout);
 
     // write the target screen data to file
-    target->writeFieldHDF5("Mirror_25_par.h5");
+    target->writeFieldHDF5("Mirror_201.h5");
     
     delete source;
     delete target;
