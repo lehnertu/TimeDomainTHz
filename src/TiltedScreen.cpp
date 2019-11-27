@@ -99,10 +99,11 @@ int main(int argc, char* argv[])
     time(&start_t);
     time_t print_time = start_t;
     time_t now;
+    int counter = 0;
     // parallel domain
     // all variables declared outside this block are shared, e.g. source, target
     // all variables declared inside this block are private, e.g. pos, target_trace
-    #pragma omp parallel
+    #pragma omp parallel shared(counter)
     {
         #pragma omp single
         {
@@ -122,12 +123,15 @@ int main(int argc, char* argv[])
             Vector pos = target->get_point(ix,iy);
             FieldTrace target_trace = source->propagation(pos, target_t0, Nt);
             target->set_Trace(ix, iy, target_trace);
+            // all threads increment the counter
+            #pragma omp atomic
+            counter++;
             // only the master thread keeps the time
             if (omp_get_thread_num()==0)
             {
                 time(&now);
                 if (difftime(now, print_time)>10.0)
-                    std::cout << "completed " << 100.0*(double)i/(double)(Nx*Ny) << "%" << std::endl;
+                    std::cout << "completed " << 100.0*(double)counter/(double)(Nx*Ny) << "%" << std::endl;
             };
         };
     };
