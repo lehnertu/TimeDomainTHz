@@ -38,6 +38,8 @@
 #include <stdlib.h>
 #include <iostream>
 #include <math.h>
+#include <time.h>
+#include <omp.h>
 
 #include "global.h"
 #include "fields.h"
@@ -47,7 +49,7 @@ int main(int argc, char* argv[])
 {
     std::cout << std::endl;
     std::cout << "Propagate to Tilted Screen" << std::endl << std::endl;
-
+    
     // load the input field from a file
     if (argc<2)
     {
@@ -69,8 +71,8 @@ int main(int argc, char* argv[])
 
     // define the target screen
     double distance = 1.25751;
-    int Nx = 51;
-    int Ny = 51;
+    int Nx = 25;
+    int Ny = 25;
     FieldTrace source_trace = source->get_Trace(0,0);
     int Nt = source_trace.get_N()+400;
     Screen *target = new Screen(
@@ -81,24 +83,36 @@ int main(int argc, char* argv[])
     target->writeReport(&cout);
 
     // compute the source beam propagated to the target screen
+    std::cout << "running on " << omp_get_max_threads() << " parallel threads" << std::endl;
     std::cout << "computing propagated source fields ..." << std::endl;
     double target_t0 = source->get_t0()+distance/SpeedOfLight;
-    for (int ix=0; ix<Nx; ix++)
+    time_t start_t, end_t;
+    time(&start_t);
+    // parallel domain
+    // all variables declared outside this block are shared, e.g. source, target
+    // all variables declared inside this block are private, e.g. pos, target_trace
+    #pragma omp parallel
     {
-        for (int iy=0; iy<Ny; iy++)
+        #pragma omp parallel for
+        for (int ix=0; ix<Nx; ix++)
         {
-            Vector pos = target->get_point(ix,iy);
-            FieldTrace target_trace = source->propagation(pos, target_t0, Nt);
-            target->set_Trace(ix, iy, target_trace);
-            std::cout << iy << " ";
+            for (int iy=0; iy<Ny; iy++)
+            {
+                Vector pos = target->get_point(ix,iy);
+                FieldTrace target_trace = source->propagation(pos, target_t0, Nt);
+                target->set_Trace(ix, iy, target_trace);
+                // std::cout << iy << " ";
+            };
+            // std::cout << ix << std::endl;
         };
-        std::cout << ix << std::endl;
-    };
-    std::cout << "done." << std::endl;
+    }
+    // end parallel domain
+    time(&end_t);
+    std::cout << "completed after " << difftime(end_t, start_t) << "seconds." << std::endl;
     std::cout << std::endl;
 
     // write the target screen data to file
-    target->writeFieldHDF5("Mirror_25.h5");
+    target->writeFieldHDF5("Mirror_25_par.h5");
     
     delete source;
     delete target;
