@@ -83,9 +83,10 @@ public:
     Vector get_yVec()  { return yVec; }
     double get_t0() { return A[0][0].get_t0(); }
     double get_dt() { return A[0][0].get_dt(); }
+    double get_tCenter() { return A[0][0].get_tCenter(); }
     
     /*! Get the position of one grid cell */
-    Vector get_point(int ix, int iy);
+    Vector get_point(int ix, int iy); 
     
     /*! Get/Set the field trace data for one of the grid cells */
     FieldTrace get_Trace(int ix, int iy) { return A[ix][iy]; }
@@ -111,12 +112,15 @@ public:
      */
     void bufferArray(double *buffer);
 
-    /*! Compute the spatial and temporal derivatives of the fields
+    /*! Compute the spatial and temporal derivatives of the fields.
+     *  internally parallelized using Open-MP
      *  @TODO The computation is flawed as it assumes orthogonality of xVec and yVec
      *  when computing the normal derivatives.
      *  Signs of the drivatives have been checked to match those of the python code.
      *  This may be wrong, in particular for dy_A (because yVec is -ey in the test case)
      *  and dn_A should be dz_A but is set to -dz_A.
+     *  @TODO For the propagation only the temporal and normal derivatives are needed.
+     *  It is not necessary to store the transverse derivatives.
      */    
     void computeDerivatives();
 

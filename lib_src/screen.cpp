@@ -223,6 +223,8 @@ void Screen::computeDerivatives()
     double dX = xVec.norm();
     double dY = yVec.norm();
     // compute the x-derivatives
+    // this is the drivative along the xVec direction (in the screen-local frame)
+    // pragma omp parallel for
     for (int iy=0; iy<Ny; iy++)
     {
         dx_A[0][iy] = (A[1][iy] - A[0][iy]) / dX;
@@ -231,6 +233,8 @@ void Screen::computeDerivatives()
         dx_A[Nx-1][iy] = (A[Nx-1][iy] - A[Nx-2][iy]) / dX;
     }
     // compute the y-derivatives
+    // this is the drivative along the xVec direction (in the screen-local frame)
+    // pragma omp parallel for
     for (int ix=0; ix<Nx; ix++)
     {
         dy_A[ix][0] = (A[ix][1] - A[ix][0]) / dY;
@@ -239,10 +243,13 @@ void Screen::computeDerivatives()
         dy_A[ix][Ny-1] = (A[ix][Ny-1] - A[ix][Ny-2]) / dY;
     }
     // compute the time-derivatives for all traces
+    // pragma omp parallel for
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
             dt_A[ix][iy] = A[ix][iy].derivative();
     // compute the normal derivatives using the Maxwell equations
+    // this is the drivative along the Normal direction (in the screen-local frame)
+    // is is assumed that (xVec, yVec, Normal) form a right-handed orthogonal reference frame
     int Nt = A[0][0].get_N();
     FieldTrace trace(0.0,0.0,Nt);
     double *pEx, *pEy, *pEz, *pBx, *pBy, *pBz;
@@ -254,6 +261,7 @@ void Screen::computeDerivatives()
     pBx = dx_Bx;
     double *dx_Bz = new double[Nx*Ny*Nt];
     pBz = dx_Bz;
+    // pragma omp parallel for
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {
@@ -275,6 +283,7 @@ void Screen::computeDerivatives()
     pBy = dy_By;
     double *dy_Bz = new double[Nx*Ny*Nt];
     pBz = dy_Bz;
+    // pragma omp parallel for
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {
@@ -296,6 +305,7 @@ void Screen::computeDerivatives()
     pBx = dt_Bx;
     double *dt_By = new double[Nx*Ny*Nt];
     pBy = dt_By;
+    // pragma omp parallel for
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {
@@ -316,6 +326,7 @@ void Screen::computeDerivatives()
     double *dz_By = new double[Nx*Ny*Nt];
     double *dz_Bz = new double[Nx*Ny*Nt];
     double cSquared = SpeedOfLight*SpeedOfLight;
+    // pragma omp parallel for
     for (int i=0; i<Nx*Ny*Nt; i++)
     {
         dz_Ex[i] = dx_Ez[i] - dt_By[i];
@@ -331,6 +342,7 @@ void Screen::computeDerivatives()
     pBx = dz_Bx;
     pBy = dz_By;
     pBz = dz_Bz;
+    // pragma omp parallel for
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {

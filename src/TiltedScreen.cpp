@@ -82,25 +82,27 @@ int main(int argc, char* argv[])
     
     // define the target screen
     double distance = 1.25751;
-    int Nx = 201;
-    int Ny = 25;
+    int Nx = 2001;
+    int Ny = 51;
     FieldTrace source_trace = source->get_Trace(0,0);
     int Nt = source_trace.get_N()+4000;
     Screen *target = new Screen(
         Nx, Ny, Nt,
-        Vector(0.0005,0.0,0.0005),
-        Vector(0.0,-0.004,0.0),
+        Vector(0.00005,0.0,0.00005),
+        Vector(0.0,-0.002,0.0),
         source->get_Center() + Vector(0.0,0.0,distance) );
     target->writeReport(&cout);
 
     // compute the source beam propagated to the target screen
-    double target_t0 = source->get_t0()+distance/SpeedOfLight-source->get_dt()*2000;
+    double target_t0 = source->get_tCenter()+distance/SpeedOfLight-source->get_dt()*(double)Nt/2.0;
     time_t start_t;
     time(&start_t);
     time_t print_time = start_t;
     time_t now;
+    // count the target screen points already computed
     int counter = 0;
     // parallel domain
+    // optional parameter :  num_threads(32)
     // all variables declared outside this block are shared, e.g. source, target
     // all variables declared inside this block are private, e.g. pos, target_trace
     #pragma omp parallel shared(counter)
@@ -131,7 +133,11 @@ int main(int argc, char* argv[])
             {
                 time(&now);
                 if (difftime(now, print_time)>10.0)
-                    std::cout << "completed " << 100.0*(double)counter/(double)(Nx*Ny) << "%" << std::endl;
+                {
+                    print_time = now;
+                    std::cout << "completed " << 100.0*(double)counter/(double)(Nx*Ny) << "%";
+                    std::cout << "   after " << difftime(now, start_t) << " seconds" << std::endl;
+                };
             };
         };
     };
@@ -142,7 +148,7 @@ int main(int argc, char* argv[])
     target->writeReport(&cout);
 
     // write the target screen data to file
-    target->writeFieldHDF5("Mirror_201.h5");
+    target->writeFieldHDF5("Mirror_2001.h5");
     
     delete source;
     delete target;

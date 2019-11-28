@@ -1,0 +1,12 @@
+#!/bin/bash
+
+source $HOME/.bashrc
+basedir=$HOME/TimeDomainTHz
+rundir=/bigdata/fwke/lehnertu/TimeDomainTHz
+
+module load gcc
+module load hdf5
+
+cd $rundir
+$basedir/build/TiltedScreen Gaussian_51.h5
+

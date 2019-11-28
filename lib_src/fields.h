@@ -160,6 +160,9 @@ public:
     double get_dt() { return dt; };
     int get_N() { return N; };
     
+    /*! Get the center time of the trace */
+    double get_tCenter() { return t0+0.5*dt*(double)N; }
+    
     /*! Get the time of one point of the trace */
     double get_time(int index);
     
