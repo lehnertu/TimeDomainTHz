@@ -40,8 +40,6 @@ Screen::Screen(
     FieldTrace zero_trace(0.0,0.0,Nt_p);
     std::vector<FieldTrace> zero_column(Ny, zero_trace);
     A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
-    dx_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
-    dy_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
     dn_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
     dt_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
 }
@@ -131,8 +129,6 @@ Screen::Screen(std::string filename)
     
     status = H5Fclose (file);
     if (status<0) throw(Screen_FileReadError());
-    dx_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
-    dy_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
     dn_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
     dt_A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
 }
@@ -218,30 +214,45 @@ void Screen::bufferArray(double *buffer)
         }
 }
 
+FieldTrace Screen::dx_A(int ix, int iy)
+{
+    if (ix<0 || ix>=Nx) throw(Screen_IndexOutOfRange());
+    if (iy<0 || iy>=Ny) throw(Screen_IndexOutOfRange());
+    double dX = xVec.norm();
+    FieldTrace trace(get_t0(),get_dt(),get_Nt());
+    if (ix==0)
+        trace = (A[1][iy] - A[0][iy]) / dX;
+    else 
+    {
+        if (ix==Nx-1)
+            trace = (A[Nx-1][iy] - A[Nx-2][iy]) / dX;
+        else
+            trace = (A[ix+1][iy] - A[ix-1][iy]) / (dX*2.0);
+    }
+    return trace;
+}
+
+FieldTrace Screen::dy_A(int ix, int iy)
+{
+    if (ix<0 || ix>=Nx) throw(Screen_IndexOutOfRange());
+    if (iy<0 || iy>=Ny) throw(Screen_IndexOutOfRange());
+    double dY = yVec.norm();
+    FieldTrace trace(get_t0(),get_dt(),get_Nt());
+    
+    if (iy==0)
+        trace = (A[ix][1] - A[ix][0]) / dY;
+    else 
+    {
+        if (iy==Ny-1)
+            trace = (A[ix][Ny-1] - A[ix][Ny-2]) / dY;
+        else
+            trace = (A[ix][iy+1] - A[ix][iy-1]) / (dY*2.0);
+    }
+    return trace;
+}
+
 void Screen::computeDerivatives()
 {
-    double dX = xVec.norm();
-    double dY = yVec.norm();
-    // compute the x-derivatives
-    // this is the drivative along the xVec direction (in the screen-local frame)
-    // pragma omp parallel for
-    for (int iy=0; iy<Ny; iy++)
-    {
-        dx_A[0][iy] = (A[1][iy] - A[0][iy]) / dX;
-        for (int ix=1; ix<Nx-1; ix++)
-            dx_A[ix][iy] = (A[ix+1][iy] - A[ix-1][iy]) / (dX*2.0);
-        dx_A[Nx-1][iy] = (A[Nx-1][iy] - A[Nx-2][iy]) / dX;
-    }
-    // compute the y-derivatives
-    // this is the drivative along the xVec direction (in the screen-local frame)
-    // pragma omp parallel for
-    for (int ix=0; ix<Nx; ix++)
-    {
-        dy_A[ix][0] = (A[ix][1] - A[ix][0]) / dY;
-        for (int iy=1; iy<Ny-1; iy++)
-            dy_A[ix][iy] = (A[ix][iy+1] - A[ix][iy-1]) / (dY*2.0);
-        dy_A[ix][Ny-1] = (A[ix][Ny-1] - A[ix][Ny-2]) / dY;
-    }
     // compute the time-derivatives for all traces
     // pragma omp parallel for
     for (int ix=0; ix<Nx; ix++)
@@ -261,11 +272,12 @@ void Screen::computeDerivatives()
     pBx = dx_Bx;
     double *dx_Bz = new double[Nx*Ny*Nt];
     pBz = dx_Bz;
-    // pragma omp parallel for
+    // this is not parallelizable because the pointers are used by all threads
+    // pragma omp parallel for private(trace)
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {
-            trace = dx_A[ix][iy];
+            trace = dx_A(ix,iy);
             for (int it=0; it<Nt; it++)
             {
                 ElMagField f = trace.get_field(it);
@@ -283,11 +295,12 @@ void Screen::computeDerivatives()
     pBy = dy_By;
     double *dy_Bz = new double[Nx*Ny*Nt];
     pBz = dy_Bz;
-    // pragma omp parallel for
+    // this is not parallelizable because the pointers are used by all threads
+    // pragma omp parallel for private(trace)
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {
-            trace = dy_A[ix][iy];
+            trace = dy_A(ix,iy);
             for (int it=0; it<Nt; it++)
             {
                 ElMagField f = trace.get_field(it);
@@ -305,7 +318,8 @@ void Screen::computeDerivatives()
     pBx = dt_Bx;
     double *dt_By = new double[Nx*Ny*Nt];
     pBy = dt_By;
-    // pragma omp parallel for
+    // this is not parallelizable because the pointers are used by all threads
+    // pragma omp parallel for private(trace)
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {
@@ -326,7 +340,8 @@ void Screen::computeDerivatives()
     double *dz_By = new double[Nx*Ny*Nt];
     double *dz_Bz = new double[Nx*Ny*Nt];
     double cSquared = SpeedOfLight*SpeedOfLight;
-    // pragma omp parallel for
+    // this is not parallelizable because the pointers are used by all threads
+    // pragma omp parallel for private(trace)
     for (int i=0; i<Nx*Ny*Nt; i++)
     {
         dz_Ex[i] = dx_Ez[i] - dt_By[i];
@@ -342,6 +357,7 @@ void Screen::computeDerivatives()
     pBx = dz_Bx;
     pBy = dz_By;
     pBz = dz_Bz;
+    // this is not parallelizable because the pointers are used by all threads
     // pragma omp parallel for
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)

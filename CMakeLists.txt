@@ -45,6 +45,12 @@ target_link_libraries(GaussianWavePacket
         ${HDF5_LIBRARIES}
         ${ZLIB_LIBRARY_RELEASE} )
 
+add_executable(PropagateStraight ${PROJECT_SOURCE_DIR}/src/PropagateStraight.cpp)
+target_link_libraries(PropagateStraight
+        thzlib
+        ${HDF5_LIBRARIES}
+        ${ZLIB_LIBRARY_RELEASE} )
+
 add_executable(TiltedScreen ${PROJECT_SOURCE_DIR}/src/TiltedScreen.cpp)
 target_link_libraries(TiltedScreen
         thzlib

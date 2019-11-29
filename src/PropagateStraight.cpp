@@ -48,7 +48,7 @@
 int main(int argc, char* argv[])
 {
     std::cout << std::endl;
-    std::cout << "Propagate to Tilted Screen" << std::endl << std::endl;
+    std::cout << "Propagate to Screen" << std::endl << std::endl;
     
     // load the input field from a file
     if (argc<2)
@@ -69,27 +69,16 @@ int main(int argc, char* argv[])
     // Screen::bufferArray() is changed to deliver dx_A instead of A
     // source->writeFieldHDF5("Gaussian_51_dx.h5");
 
-    // The target screen is angled 45 degrees to the beam incidence (z axis).
-    // It reflects the beam from z propagation direction to x.
-    
-    // The taget screen has to resolve the wavelength - the pixel spacing
-    // in x/z direction should be less than 1/20 of the wavelength
-    // lambda=1mm => 0.05mm  in this case
-    
-    // The target screen total size is 100x100mm in the projection giving 140mm in the tilted plane.
-    // The length of the time trace has to be increased to accomodate the
-    // 50mm = 170ps = 1700*dt  difference of arrival times center to edge
-    
     // define the target screen
-    double distance = 1.25751;
-    int Nx = 81;
-    int Ny = 15;
+    double distance = 2.0 * 1.25751;
+    int Nx = 51;
+    int Ny = 51;
     FieldTrace source_trace = source->get_Trace(0,0);
     int Nt = source_trace.get_N()+4000;
     Screen *target = new Screen(
         Nx, Ny, Nt,
-        Vector(0.0005,0.0,0.0005),
-        Vector(0.0,-0.005,0.0),
+        Vector(0.003,0.0,0.0),
+        Vector(0.0,-0.003,0.0),
         source->get_Center() + Vector(0.0,0.0,distance) );
     target->writeReport(&cout);
 
@@ -148,7 +137,7 @@ int main(int argc, char* argv[])
     target->writeReport(&cout);
 
     // write the target screen data to file
-    target->writeFieldHDF5("Mirror_81P.h5");
+    target->writeFieldHDF5("Gaussian_25_Straight_51_C.h5");
     
     delete source;
     delete target;

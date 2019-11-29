@@ -139,6 +139,18 @@ public:
 
 private:
 
+    /*! Compute the field derivative along the xVec direction.
+     *  This is used when computing the normal derivatives.
+     */
+    FieldTrace dx_A(int ix, int iy);
+
+    /*! Compute the field derivative along the yVec direction.
+     *  This is used when computing the normal derivatives.
+     */
+    FieldTrace dy_A(int ix, int iy);
+
+private:
+
     /*! number of grid cells in each direction */
     int Nx, Ny;
     
@@ -158,16 +170,6 @@ private:
      *  outer (first) index is Nx
     */
     std::vector< std::vector<FieldTrace> > A;
-
-    /*! partial derivative of the fields along the xVec direction
-     *  data are only valid after calling computeDerivatives()
-     */
-    std::vector< std::vector<FieldTrace> > dx_A;
-
-    /*! partial derivative of the fields along the yVec direction
-     *  data are only valid after calling computeDerivatives()
-     */
-    std::vector< std::vector<FieldTrace> > dy_A;
 
     /*! partial derivative of the fields along the normal direction
      *  data are only valid after calling computeDerivatives()
