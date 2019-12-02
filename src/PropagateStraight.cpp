@@ -68,13 +68,15 @@ int main(int argc, char* argv[])
     // with modified sources we write the derivatives insted
     // Screen::bufferArray() is changed to deliver dx_A instead of A
     // source->writeFieldHDF5("Gaussian_51_dx.h5");
+    Vector origin = source->get_Center();
+    FieldTrace source_trace = source->get_trace(source->get_Nx()/2,source->get_Ny()/2);
 
     // define the target screen
     double distance = 2.0 * 1.25751;
     int Nx = 51;
     int Ny = 51;
-    FieldTrace source_trace = source->get_Trace(0,0);
-    int Nt = source_trace.get_N()+4000;
+    int Nt = source_trace.get_N();
+    double dt = source_trace.get_dt();
     Screen *target = new Screen(
         Nx, Ny, Nt,
         Vector(0.003,0.0,0.0),
@@ -83,7 +85,6 @@ int main(int argc, char* argv[])
     target->writeReport(&cout);
 
     // compute the source beam propagated to the target screen
-    double target_t0 = source->get_tCenter()+distance/SpeedOfLight-source->get_dt()*(double)Nt/2.0;
     time_t start_t;
     time(&start_t);
     time_t print_time = start_t;
@@ -106,14 +107,13 @@ int main(int argc, char* argv[])
             // we comprise the two loops over ix and iy into one parallel loop
             int ix = i/Ny;
             int iy = i - ix*Ny;
-            /* pragma omp critical
-            {
-                std::cout << "ix = " << ix << "  iy = " << iy << std::endl;
-            };
-            */
             Vector pos = target->get_point(ix,iy);
-            FieldTrace target_trace = source->propagation(pos, target_t0, Nt);
-            target->set_Trace(ix, iy, target_trace);
+            double delta = (pos-origin).norm()/SpeedOfLight;
+            // if the traces have different length delta has to be adjusted
+            // to align the center and not the beginning of the traces
+            FieldTrace target_trace(source_trace.get_t0()+delta,dt,Nt);
+            source->propagate_to(pos, &target_trace);
+            target->set_trace(ix, iy, target_trace);
             // all threads increment the counter
             #pragma omp atomic
             counter++;
@@ -137,7 +137,7 @@ int main(int argc, char* argv[])
     target->writeReport(&cout);
 
     // write the target screen data to file
-    target->writeFieldHDF5("Gaussian_25_Straight_51_C.h5");
+    target->writeFieldHDF5("Gaussian_51_Straight_51.h5");
     
     delete source;
     delete target;

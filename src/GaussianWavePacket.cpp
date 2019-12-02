@@ -80,10 +80,10 @@ int main(int argc, char* argv[])
     std::cout << " J/m²" << std::endl << std::endl;
     
     // setup the geometry of the screen
-    int Nx = 51;
-    int Ny = 51;
+    int Nx = 25;
+    int Ny = 25;
     Screen *scr = new Screen( Nx, Ny, 400,
-        Vector(0.002,0.0,0.0), Vector(0.0,-0.002,0.0),
+        Vector(0.004,0.0,0.0), Vector(0.0,-0.004,0.0),
         Vector(0.0,0.0,0.0) );
     
     // set the field traces for all grid points of the screen
@@ -101,7 +101,7 @@ int main(int argc, char* argv[])
     scr->writeReport(&cout);
     
     // write the screen data to file
-    scr->writeFieldHDF5("Gaussian_51.h5");
+    scr->writeFieldHDF5("Gaussian_25.h5");
 
     // clean up
     delete scr;

@@ -63,7 +63,7 @@ Screen::Screen(std::string filename)
     if (attr<0) throw(Screen_FileReadError());
     status =  H5Aread(attr, H5T_NATIVE_INT, &Ny);
     if (status<0) throw(Screen_FileReadError());
-    // now we know the size of the dataset - create and fill a buffer
+    // create and fill a buffer
     Vector *pos = new Vector[Nx*Ny];
     status = H5Dread (pos_dataset,
         H5T_NATIVE_DOUBLE, 		// mem type id
@@ -87,25 +87,35 @@ Screen::Screen(std::string filename)
     Center = (pos11+pos00)*0.5;
     delete pos;
 
+    // open the trace timing dataset
+    hid_t time_dataset = H5Dopen2(file, "ObservationTime", H5P_DEFAULT);
+    if (time_dataset<0) throw(Screen_FileReadError());
+    attr = H5Aopen_name(time_dataset, "Nt");
+    if (attr<0) throw(Screen_FileReadError());
+    int Nt;
+    status =  H5Aread(attr, H5T_NATIVE_INT, &Nt);
+    if (status<0) throw(Screen_FileReadError());
+    attr = H5Aopen_name(time_dataset, "dt");
+    if (attr<0) throw(Screen_FileReadError());
+    double dt;
+    status =  H5Aread(attr, H5T_NATIVE_DOUBLE, &dt);
+    if (status<0) throw(Screen_FileReadError());
+    // create and fill a buffer
+    double *t0_buf = new double[Nx*Ny];
+    status = H5Dread (time_dataset,
+        H5T_NATIVE_DOUBLE, 		// mem type id
+        H5S_ALL, 			    // mem space id
+        H5S_ALL,
+        H5P_DEFAULT,			// data transfer properties
+        t0_buf);
+    if (status<0) throw(Screen_FileReadError());
+    status = H5Dclose(time_dataset);
+    if (status<0) throw(Screen_FileReadError());
+
     // open the field dataset
     hid_t field_dataset = H5Dopen2(file, "ElMagField", H5P_DEFAULT);
     if (field_dataset<0) throw(Screen_FileReadError());
-    int Nt;
-    attr = H5Aopen_name(field_dataset, "NOTS");
-    if (attr<0) throw(Screen_FileReadError());
-    status =  H5Aread(attr, H5T_NATIVE_INT, &Nt);
-    if (status<0) throw(Screen_FileReadError());
-    double t0;
-    attr = H5Aopen_name(field_dataset, "t0");
-    if (attr<0) throw(Screen_FileReadError());
-    status =  H5Aread(attr, H5T_NATIVE_DOUBLE, &t0);
-    if (status<0) throw(Screen_FileReadError());
-    double dt;
-    attr = H5Aopen_name(field_dataset, "dt");
-    if (attr<0) throw(Screen_FileReadError());
-    status =  H5Aread(attr, H5T_NATIVE_DOUBLE, &dt);
-    if (status<0) throw(Screen_FileReadError());
-    // now we know the size of the dataset - create and fill a buffer
+    // create and fill a buffer
     ElMagField *field = new ElMagField[Nx*Ny*Nt];
     status = H5Dread (field_dataset,
         H5T_NATIVE_DOUBLE, 		// mem type id
@@ -114,17 +124,21 @@ Screen::Screen(std::string filename)
         H5P_DEFAULT,			// data transfer properties
         field);
     // transfer the data into the internal data structures
-    FieldTrace trace(t0, dt, Nt);
-    std::vector<FieldTrace> zero_column(Ny, trace);
+    FieldTrace zero_trace(0.0, dt, Nt);
+    std::vector<FieldTrace> zero_column(Ny, zero_trace);
     A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
     ElMagField *buf = field;
+    double *pt0 = t0_buf;
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {   
+            FieldTrace trace(&zero_trace);
+            trace.set_t0(*pt0++);
             trace.set(buf,Nt);
             buf += Nt;
             A[ix][iy] = trace;
         }
+    delete t0_buf;
     delete field;
     
     status = H5Fclose (file);
