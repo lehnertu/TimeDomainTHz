@@ -2,13 +2,19 @@
 # coding=UTF-8
 
 import sys, time
-import os.path
+import os
+import psutil
 import argparse
 import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter
 from matplotlib.patches import Circle
+
+pid = os.getpid()
+print("PID = ",pid)
+libmem = psutil.Process(pid).memory_info().rss/2.0**20
+print('libraries memory use: %.2f MB' % libmem)
 
 # magnetic field constant in N/A²
 mu0 = 4*np.pi*1e-7
@@ -30,12 +36,12 @@ if not radOK:
 print("reading %s" % radfile)
 hdf = h5py.File(radfile, "r")
 print(hdf)
-print()
-
 # Get the groups
 pos = hdf['ObservationPosition']
 Nx = pos.attrs.get('Nx')
 Ny = pos.attrs.get('Ny')
+xcenter = (Nx-1)//2
+ycenter = (Ny-1)//2
 print("Nx=%d Ny=%d" % (Nx,Ny))
 print(pos)
 time = hdf['ObservationTime']
@@ -47,25 +53,30 @@ field = hdf['ElMagField']
 print(field)
 pos = np.array(pos)
 t0 = np.array(time)
-a = np.array(field)
+# a = np.array(field)
+# direct slicing to reduce the memory requirements
+# this should never store the complete array
+onaxis = np.array(field[xcenter,ycenter,:,:])
+if args.xy != None:
+    xi = args.xy[0]
+    yi = args.xy[1]
+    offaxis = np.array(field[xi,yi,:,:])
 hdf.close()
+print("file closed.")
+
+print('data memory use: %.2f MB' % (psutil.Process(pid).memory_info().rss/2.0**20-libmem))
 print()
 
-xcenter = (Nx-1)//2
-ycenter = (Ny-1)//2
 print("center = (%d, %d)" % (xcenter,ycenter))
 centerposition = pos[xcenter][ycenter]
 print("center position = %s" % centerposition)
 
-onaxis = a[xcenter][ycenter]
-data = onaxis.transpose()
-
-Ex = data[0]
-Ey = data[1]
-Ez = data[2]
-Bx = data[3]
-By = data[4]
-Bz = data[5]
+Ex = onaxis[:,0]
+Ey = onaxis[:,1]
+Ez = onaxis[:,2]
+Bx = onaxis[:,3]
+By = onaxis[:,4]
+Bz = onaxis[:,5]
 
 EVec = np.array([Ex, Ey, Ez]).transpose()
 BVec = np.array([Bx, By, Bz]).transpose()
@@ -115,15 +126,12 @@ if args.xy != None:
     position = pos[xi][yi]
     print("off-axis position = %s" % position)
 
-    offaxis = a[xi][yi]
-    data = offaxis.transpose()
-    
-    Ex = data[0]
-    Ey = data[1]
-    Ez = data[2]
-    Bx = data[3]
-    By = data[4]
-    Bz = data[5]
+    Ex = offaxis[:,0]
+    Ey = offaxis[:,1]
+    Ez = offaxis[:,2]
+    Bx = offaxis[:,3]
+    By = offaxis[:,4]
+    Bz = offaxis[:,5]
 
     EVec = np.array([Ex, Ey, Ez]).transpose()
     BVec = np.array([Bx, By, Bz]).transpose()
