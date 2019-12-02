@@ -75,6 +75,8 @@ public:
      *  these values are not expected to change once constructed */
     int get_Nx() { return Nx; }
     int get_Ny() { return Ny; }
+    int get_Nt() { return get_trace(0,0).get_N(); }
+    double get_dt() { return get_trace(0,0).get_dt(); }
     Vector get_Center()  { return Center; }
     Vector get_Normal()  { return Normal; }
     double get_dA()  { return dA; }
@@ -84,8 +86,9 @@ public:
     /*! Get the position of one grid cell */
     Vector get_point(int ix, int iy); 
     
-    /*! Get/Set the field trace data for one of the grid cells */
-    FieldTrace get_trace(int ix, int iy) { return A[ix][iy]; }
+    /*! Get the field trace data for one of the grid cells */
+    FieldTrace get_trace(int ix, int iy);
+
     /*! Set the field trace data for one of the grid cells */
     void set_trace(int ix, int iy, FieldTrace trace);
     

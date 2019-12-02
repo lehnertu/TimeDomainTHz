@@ -74,6 +74,7 @@ int main(int argc, char* argv[])
         on_axis->set(i, peak*osc);
     };
     Vector dPdA = on_axis->Poynting();
+    std::cout << "dt  = " << on_axis->get_dt()*1.0e9 << " ns" << std::endl;
     std::cout << "Power density on axis = ";
     std::cout << "(" << dPdA.x << ", " << dPdA.y << ", " << dPdA.z << ")";
     std::cout << " J/m²" << std::endl << std::endl;
