@@ -30,10 +30,11 @@ class TimeDomainField:
         # x-left  y-up  z-forward
         self.normal = np.cross(self.dxVec,self.dyVec)
         self.normal = self.normal / np.linalg.norm(self.normal)
+        t = hdf['ObservationTime']
+        self.dt = t.attrs.get('dt')
+        self.Nt = t.attrs.get('Nt')
+        self.t0 = np.array(t)
         f = hdf['ElMagField']
-        self.t0 = f.attrs.get('t0')
-        self.dt = f.attrs.get('dt')
-        self.Nt = f.attrs.get('NOTS')
         self.A = np.array(f)
         hdf.close()
 
@@ -43,31 +44,12 @@ class TimeDomainField:
         h5p = hf.create_dataset('ObservationPosition', data=self.pos)
         h5p.attrs['Nx'] = self.Nx
         h5p.attrs['Ny'] = self.Ny
+        h5p = hf.create_dataset('ObservationTime', data=self.t0)
+        h5p.attrs['Nt'] = self.Nt
+        h5p.attrs['dt'] = self.dt
         h5f = hf.create_dataset('ElMagField', data=self.A)
-        h5f.attrs['t0'] = self.t0
-        h5f.attrs['dt'] = self.dt
-        h5f.attrs['NOTS'] = self.Nt
         hf.close()
 
-    # create a grid of positions
-    # all grid cells have equal dimensions and alignment vectors
-    def setupGrid(self, centerVec, xVec, yVec):
-        self.dxVec = xVec
-        self.dyVec = yVec
-        # this is the backward normal assuming z-direction beam propagation
-        # x-left  y-up  z-forward
-        self.normal = -np.cross(self.dxVec,self.dyVec)
-        self.normal = self.normal / np.linalg.norm(self.normal)
-        self.dX = np.linalg.norm(self.dxVec)
-        self.dY = np.linalg.norm(self.dyVec)
-        ixc, iyc = self.center_index()
-        x = np.arange(self.Nx)-ixc
-        y = np.arange(self.Ny)-iyc
-        self.pos = np.zeros((self.Nx,self.Ny,3))
-        for ix in range(self.Nx):
-            for iy in range(self.Ny):
-                self.pos[ix,iy] = centerVec + xVec*x[ix] + yVec*y[iy]
-        
     # return the center of the field distribution
     def center_index(self):
         ixc = (self.Nx-1)//2

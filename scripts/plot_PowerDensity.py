@@ -28,7 +28,7 @@ print("reading %s" % infile)
 Source.read(infile)
 
 print("Nx=%d Ny=%d" % (Source.Nx,Source.Ny))
-print("t0=%g dt=%g NOTS=%d" % (Source.t0, Source.dt, Source.Nt))
+print("dt=%g Nt=%d" % (Source.dt, Source.Nt))
 print()
 
 xc, yc = Source.center_index()

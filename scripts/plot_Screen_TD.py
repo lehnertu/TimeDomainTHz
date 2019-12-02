@@ -38,13 +38,15 @@ Nx = pos.attrs.get('Nx')
 Ny = pos.attrs.get('Ny')
 print("Nx=%d Ny=%d" % (Nx,Ny))
 print(pos)
+time = hdf['ObservationTime']
+nots = time.attrs.get('Nt')
+dt = time.attrs.get('dt')
+print("Nt=%d dt=%g" % (nots,dt))
+print(time)
 field = hdf['ElMagField']
 print(field)
-t0 = field.attrs.get('t0')
-dt = field.attrs.get('dt')
-nots = field.attrs.get('NOTS')
-print("t0=%g dt=%g NOTS=%d" % (t0, dt, nots))
 pos = np.array(pos)
+t0 = np.array(time)
 a = np.array(field)
 hdf.close()
 print()
@@ -69,8 +71,7 @@ EVec = np.array([Ex, Ey, Ez]).transpose()
 BVec = np.array([Bx, By, Bz]).transpose()
 # Poynting vector in V/m * (N/(A m)) / (N/A²) = W/m²
 SVec = np.cross(EVec, BVec) / mu0
-# t = 1e9*np.arange(t0,t0+(nots-1)*dt,dt)
-t = 1e9*np.linspace(t0,t0+(nots-1)*dt,nots)
+t = 1e9*np.linspace(t0[xcenter][ycenter],t0[xcenter][ycenter]+(nots-1)*dt,nots)
 print("on axis energy flow density = %s µJ/m²" % (1e6*SVec.sum(axis=0)*dt))
 
 # first figure with the time-trace of the fields on axis
@@ -128,8 +129,7 @@ if args.xy != None:
     BVec = np.array([Bx, By, Bz]).transpose()
     # Poynting vector in V/m * (N/(A m)) / (N/A²) = W/m²
     SVec = np.cross(EVec, BVec) / mu0
-    # t = 1e9*np.arange(t0,t0+(nots-1)*dt,dt)
-    t = 1e9*np.linspace(t0,t0+(nots-1)*dt,nots)
+    t = 1e9*np.linspace(t0[xi][yi],t0[xi][yi]+(nots-1)*dt,nots)
     print("off axis energy flow density = %s µJ/m²" % (1e6*SVec.sum(axis=0)*dt))
 
     # second figure with the time-trace of the fields off axis
