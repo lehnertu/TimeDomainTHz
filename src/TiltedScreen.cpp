@@ -77,24 +77,37 @@ int main(int argc, char* argv[])
     // lambda=1mm => 0.05mm  in this case
     
     // The target screen total size is 100x100mm in the projection giving 140mm in the tilted plane.
-    // The length of the time trace has to be increased to accomodate the
-    // 50mm = 170ps = 1700*dt  difference of arrival times center to edge
+    // The start time of the target trace is adjusted such that the signal from
+    // the screen center at mid-time arrives at the target trace at mid-time
     
     // define the target screen
+    FieldTrace source_trace = source->get_Trace(Nx/2,Ny/2);
     double distance = 1.25751;
     int Nx = 81;
     int Ny = 15;
-    FieldTrace source_trace = source->get_Trace(0,0);
-    int Nt = source_trace.get_N()+4000;
+    int Nt = 500;
+    int dt = source_trace.get_dt();
+    Vector origin = source->get_Center();
     Screen *target = new Screen(
         Nx, Ny, Nt,
         Vector(0.0005,0.0,0.0005),
         Vector(0.0,-0.005,0.0),
         source->get_Center() + Vector(0.0,0.0,distance) );
+    FieldTrace target_trace(0.0,dt,Nt);
+    for (int ix=0; ix<NX; ix++)
+        for (int iy=0; iy<Ny; iy++)
+        {
+            Vector tpos = target->get_point(ix,iy);
+            double delta = (tpos-origin).norm()/SpeedOfLight;
+            delta += target_trace.get_tCenter()-target_trace.get_t0();
+            delta -= source_trace.get_tCenter()-source_trace.get_t0();
+            target_trace->set_t0(t0+delta);
+            target->set_Trace(ix, iy, target_trace);
+        };
+    
     target->writeReport(&cout);
 
     // compute the source beam propagated to the target screen
-    double target_t0 = source->get_tCenter()+distance/SpeedOfLight-source->get_dt()*(double)Nt/2.0;
     time_t start_t;
     time(&start_t);
     time_t print_time = start_t;
@@ -123,8 +136,9 @@ int main(int argc, char* argv[])
             };
             */
             Vector pos = target->get_point(ix,iy);
-            FieldTrace target_trace = source->propagation(pos, target_t0, Nt);
-            target->set_Trace(ix, iy, target_trace);
+            FieldTrace target_trace = target->get_trace(ix,iy);
+            source->propagate_to(pos, &target_trace);
+            target->set_trace(ix, iy, target_trace);
             // all threads increment the counter
             #pragma omp atomic
             counter++;

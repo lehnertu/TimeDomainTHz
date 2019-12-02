@@ -115,6 +115,13 @@ public:
      */
     FieldTrace(double t0_p, double dt_p, int N_p);
 
+    /*! Copy constructor:<br>
+     */
+    FieldTrace(FieldTrace *original);
+
+    /*! Erase the fields of a trace */
+    void zero();
+    
     /*! Default destructor:<br>
      *  Free memory
      */
@@ -154,9 +161,12 @@ public:
      */
     FieldTrace operator- (FieldTrace other);
 
-    /*! Get one of the sampling definitions
-     *  These are not expected to be changed, so, no setter routines are provoded */
+    /*! Get/set the start time of the trace */
     double get_t0() { return t0; };
+    void set_t0(double t) { t0=t; };
+
+    /*! Get the sampling definitions
+     *  These are not expected to be changed, so, no setter routines are provoded */
     double get_dt() { return dt; };
     int get_N() { return N; };
     
@@ -183,14 +193,13 @@ public:
     
     /*! compute a retarded trace
      *  @param delta_t - the amount of retardation in seconds
-     *  @param t0_p - start time of the new trace in seconds
-     *  @param N_p - length of the new trace
-     *  The time step remains the same.
-     *  This method thrown an exception if the returned field trace has zero radiation intensity.
-     *  This is usually an indication that the time frame of the retarded trace does
-     *  not overlap with the retarded source fields.
+     *  @param target - the new trace (fields will be overwritten)
+     *  The target trace timing will be retained.
+     *  This method throws an exception if the returned field trace has zero radiation intensity.
+     *  This is usually an indication for the time frame of the retarded trace
+     *  not overlaping with the retarded source fields.
      */
-    FieldTrace retarded(double delta_t, double t0_p, int N_p);
+    void retarded(double delta_t, FieldTrace *target);
 
 private:
 

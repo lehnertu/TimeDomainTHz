@@ -75,23 +75,19 @@ public:
      *  these values are not expected to change once constructed */
     int get_Nx() { return Nx; }
     int get_Ny() { return Ny; }
-    int get_Nt() { return A[0][0].get_N(); }
     Vector get_Center()  { return Center; }
     Vector get_Normal()  { return Normal; }
     double get_dA()  { return dA; }
     Vector get_xVec()  { return xVec; }
     Vector get_yVec()  { return yVec; }
-    double get_t0() { return A[0][0].get_t0(); }
-    double get_dt() { return A[0][0].get_dt(); }
-    double get_tCenter() { return A[0][0].get_tCenter(); }
     
     /*! Get the position of one grid cell */
     Vector get_point(int ix, int iy); 
     
     /*! Get/Set the field trace data for one of the grid cells */
-    FieldTrace get_Trace(int ix, int iy) { return A[ix][iy]; }
+    FieldTrace get_trace(int ix, int iy) { return A[ix][iy]; }
     /*! Set the field trace data for one of the grid cells */
-    void set_Trace(int ix, int iy, FieldTrace trace);
+    void set_trace(int ix, int iy, FieldTrace trace);
     
     /*! Total energy of radiation falling on the screen */
     double totalEnergy();
@@ -126,13 +122,12 @@ public:
 
     /*! Compute the fields propagated to a given point in space.
      *  It is assumed that the normal vector of the source area points outward from the volume of interest.
-     *  The time step of the target trace is the same as that of the screen.
+     *  The time sampling of the target trace is retained as given.
      *  The fields are properly retarded at the target point according to its distance from the source.
-     *  @param target observation position for the target trace
-     *  @param t0 start time of the target trace
-     *  @param N length of the target trace
+     *  @param target_pos observation position for the target trace
+     *  @param target_trace field trace to be overwritten with the result
      */
-    FieldTrace propagation(Vector target, double t0_p, int N_p);
+    void propagate_to(Vector target_pos, FieldTrace *target_trace);
 
     /*! Write the screen data to an HDF5 file */
     void writeFieldHDF5(std::string filename);

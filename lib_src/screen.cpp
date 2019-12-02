@@ -142,7 +142,7 @@ Vector Screen::get_point(int ix, int iy)
     return Center + xVec*((double)ix-0.5*((double)Nx-1.0)) + yVec*((double)iy-0.5*((double)Ny-1.0));
 }
 
-void Screen::set_Trace(int ix, int iy, FieldTrace trace)
+void Screen::set_trace(int ix, int iy, FieldTrace trace)
 {
     if (ix<0 || ix>=Nx) throw(Screen_IndexOutOfRange());
     if (iy<0 || iy>=Ny) throw(Screen_IndexOutOfRange());
@@ -219,7 +219,7 @@ FieldTrace Screen::dx_A(int ix, int iy)
     if (ix<0 || ix>=Nx) throw(Screen_IndexOutOfRange());
     if (iy<0 || iy>=Ny) throw(Screen_IndexOutOfRange());
     double dX = xVec.norm();
-    FieldTrace trace(get_t0(),get_dt(),get_Nt());
+    FieldTrace trace = A[ix][iy];
     if (ix==0)
         trace = (A[1][iy] - A[0][iy]) / dX;
     else 
@@ -237,8 +237,7 @@ FieldTrace Screen::dy_A(int ix, int iy)
     if (ix<0 || ix>=Nx) throw(Screen_IndexOutOfRange());
     if (iy<0 || iy>=Ny) throw(Screen_IndexOutOfRange());
     double dY = yVec.norm();
-    FieldTrace trace(get_t0(),get_dt(),get_Nt());
-    
+    FieldTrace trace = A[ix][iy];
     if (iy==0)
         trace = (A[ix][1] - A[ix][0]) / dY;
     else 
@@ -391,29 +390,33 @@ void Screen::computeDerivatives()
     delete dz_Bz;
 }
 
-FieldTrace Screen::propagation(Vector target, double t0_p, int N_p)
+void Screen::propagate_to(Vector target_pos, FieldTrace *target_trace)
+// FieldTrace Screen::propagation(Vector target, double t0_p, int N_p)
 {
-    double dt = A[0][0].get_dt();
-    FieldTrace trace(t0_p, dt, N_p);
+    // this is the result sum
+    FieldTrace trace(target_trace);
+    trace.zero();
+    // this is the component to be added
+    FieldTrace t2(target_trace);
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {
             Vector source = get_point(ix,iy);
-            Vector RVec = target-source;
+            Vector RVec = target_pos - source;
             double R = RVec.norm();
             double R2 = R*R;
             double R3 = R2*R;
             FieldTrace t1 = A[ix][iy];
-            FieldTrace t2 = t1.retarded(R/SpeedOfLight, t0_p, N_p);
+            t1.retarded(R/SpeedOfLight, &t2);
             trace += t2 * (dot(RVec,Normal)/R3);
             t1 = dt_A[ix][iy];
-            t2 = t1.retarded(R/SpeedOfLight, t0_p, N_p);
+            t1.retarded(R/SpeedOfLight, &t2);
             trace += t2 * (dot(RVec,Normal)/(R2*SpeedOfLight));
             t1 = dn_A[ix][iy];
-            t2 = t1.retarded(R/SpeedOfLight, t0_p, N_p);
+            t1.retarded(R/SpeedOfLight, &t2);
             trace += t2 * (-1.0/R);
         }    
-    return(trace * dA/(4.0*Pi));
+    *target_trace = trace * dA/(4.0*Pi);
 }
 
 void Screen::writeFieldHDF5(std::string filename)

@@ -122,6 +122,20 @@ FieldTrace::FieldTrace(double t0_p, double dt_p, int N_p)
     trace = std::vector<ElMagField>(N,ElMagField(Vector(0.0,0.0,0.0),Vector(0.0,0.0,0.0)));
 }
 
+FieldTrace::FieldTrace(FieldTrace *original)
+{
+    t0 = original->t0;
+    dt = original->dt;
+    N = original->N;
+    trace = original->trace;
+}
+
+void FieldTrace::zero()
+{
+    for (int i=0; i<N; i++)
+        trace[i] = ElMagField(Vector(0.0,0.0,0.0),Vector(0.0,0.0,0.0));
+}
+
 FieldTrace::~FieldTrace()
 {
     // delete [] trace;
@@ -252,22 +266,18 @@ FieldTrace FieldTrace::derivative()
     return(temp);
 }
 
-FieldTrace FieldTrace::retarded(double delta_t, double t0_p, int N_p)
+void FieldTrace::retarded(double delta_t, FieldTrace *target)
 {
-    FieldTrace ret(t0_p, dt, N_p);
-    for (int i=0; i<N_p; i++)
+    for (int i=0; i<target->get_N(); i++)
     {
-        double t = ret.get_time(i) - delta_t;
-        ret.set(i,get_field(t));
+        double t = target->get_time(i) - delta_t;
+        target->trace[i] = get_field(t);
     };
-    /*
-    if (ret.Poynting().norm()==0.0)
+    if (target->Poynting().norm()==0.0)
     {
         std::cout << "retard t0=" << t0 << " N=" << N << " P=" << Poynting().norm() << std::endl;
-        std::cout << "to     t0=" << ret.get_t0() << " N=" << ret.get_N()<< " P=" << ret.Poynting().norm() << std::endl;
+        std::cout << "to     t0=" << target->get_t0() << " N=" << target->get_N()<< " P=" << target->Poynting().norm() << std::endl;
         throw(FieldTrace_Zero());
     };
-    */
-    return(ret);
 }
 

@@ -93,7 +93,7 @@ int main(int argc, char* argv[])
             Vector pos = scr->get_point(ix,iy);
             double r = (pos-center).norm();
             double radint = exp(-r*r/(w0*w0));
-            scr->set_Trace(ix,iy, (*on_axis)*radint);
+            scr->set_trace(ix,iy, (*on_axis)*radint);
         };
         
     // print report
