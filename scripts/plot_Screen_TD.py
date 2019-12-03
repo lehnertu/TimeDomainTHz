@@ -100,12 +100,11 @@ l2 = ax1.plot(t, Ey, "b-", label=r'$E_y$')
 l3 = ax1.plot(t, Ez, "g-", label=r'$E_z$')
 
 ax1.set_ylabel(r'$E$ [V/m]')
-ax1.set_xlabel(r't [ns]')
 lines = l1 + l2 + l3
 labels = [l.get_label() for l in lines]
 ax1.legend(lines,labels,loc='upper right')
-# for label in ax1.get_xticklabels():
-#     label.set_visible(False)
+for label in ax1.get_xticklabels():
+    label.set_visible(False)
 ax1.grid(True)
 
 l4 = ax4.plot(t, Bx, "r-", label=r'$B_x$')
@@ -151,12 +150,11 @@ if args.xy != None:
     l23 = ax21.plot(t, Ez, "g-", label=r'$E_z$')
     
     ax21.set_ylabel(r'$E$ [V/m]')
-    ax21.set_xlabel(r't [ns]')
     lines = l21 + l22 + l23
     labels = [l.get_label() for l in lines]
     ax21.legend(lines,labels,loc='upper right')
-    # for label in ax21.get_xticklabels():
-    #     label.set_visible(False)
+    for label in ax21.get_xticklabels():
+        label.set_visible(False)
     ax21.grid(True)
 
     l24 = ax24.plot(t, Bx, "r-", label=r'$B_x$')

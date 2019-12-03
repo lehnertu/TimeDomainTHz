@@ -68,6 +68,10 @@ int main(int argc, char* argv[])
     // with modified sources we write the derivatives insted
     // Screen::bufferArray() is changed to deliver dx_A instead of A
     // source->writeFieldHDF5("Gaussian_51_dx.h5");
+    Vector origin = source->get_Center();
+    FieldTrace source_trace = source->get_trace(source->get_Nx()/2,source->get_Ny()/2);
+    double source_t0 = source_trace.get_t0();
+    int source_Nt = source_trace.get_N();
 
     // The target screen is angled 45 degrees to the beam incidence (z axis).
     // It reflects the beam from z propagation direction to x.
@@ -81,32 +85,18 @@ int main(int argc, char* argv[])
     // the screen center at mid-time arrives at the target trace at mid-time
     
     // define the target screen
-    FieldTrace source_trace = source->get_Trace(Nx/2,Ny/2);
     double distance = 1.25751;
-    int Nx = 81;
-    int Ny = 15;
+    int Nx = 201;
+    int Ny = 25;
     int Nt = 500;
-    int dt = source_trace.get_dt();
-    Vector origin = source->get_Center();
+    double dt = source_trace.get_dt();
     Screen *target = new Screen(
         Nx, Ny, Nt,
         Vector(0.0005,0.0,0.0005),
         Vector(0.0,-0.005,0.0),
         source->get_Center() + Vector(0.0,0.0,distance) );
-    FieldTrace target_trace(0.0,dt,Nt);
-    for (int ix=0; ix<NX; ix++)
-        for (int iy=0; iy<Ny; iy++)
-        {
-            Vector tpos = target->get_point(ix,iy);
-            double delta = (tpos-origin).norm()/SpeedOfLight;
-            delta += target_trace.get_tCenter()-target_trace.get_t0();
-            delta -= source_trace.get_tCenter()-source_trace.get_t0();
-            target_trace->set_t0(t0+delta);
-            target->set_Trace(ix, iy, target_trace);
-        };
-    
     target->writeReport(&cout);
-
+        
     // compute the source beam propagated to the target screen
     time_t start_t;
     time(&start_t);
@@ -130,13 +120,12 @@ int main(int argc, char* argv[])
             // we comprise the two loops over ix and iy into one parallel loop
             int ix = i/Ny;
             int iy = i - ix*Ny;
-            /* pragma omp critical
-            {
-                std::cout << "ix = " << ix << "  iy = " << iy << std::endl;
-            };
-            */
             Vector pos = target->get_point(ix,iy);
-            FieldTrace target_trace = target->get_trace(ix,iy);
+            double delta = (pos-origin).norm()/SpeedOfLight;
+            // if the traces have different length delta has to be adjusted
+            // to align the center and not the beginning of the traces
+            delta += (source_Nt - Nt)/2.0*dt;
+            FieldTrace target_trace(source_t0+delta,dt,Nt);
             source->propagate_to(pos, &target_trace);
             target->set_trace(ix, iy, target_trace);
             // all threads increment the counter
@@ -162,7 +151,7 @@ int main(int argc, char* argv[])
     target->writeReport(&cout);
 
     // write the target screen data to file
-    target->writeFieldHDF5("Mirror_81P.h5");
+    target->writeFieldHDF5("Gaussian_25_Tilted_201x25.h5");
     
     delete source;
     delete target;
