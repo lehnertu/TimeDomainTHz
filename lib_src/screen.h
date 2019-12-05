@@ -34,6 +34,12 @@ class Screen_IndexOutOfRange { };
 class Screen_FileWriteError { };
 /*  Reading an HDF5 file may go wrong -> throw an exception */
 class Screen_FileReadError { };
+/*  further propagate a FieldTrace_Zero exception */
+struct Screen_Zero_exception {
+    int ix;
+    int iy;
+    Screen_Zero_exception(int x, int y) {ix=x; iy=y;};
+};
 
 /*!
  * \class Screen
@@ -101,6 +107,11 @@ public:
      */
     void writeReport(std::ostream *st);
     
+    /*! Write a report of a single field trace
+     *  onto an output stream
+     */
+    void writeTraceReport(std::ostream *st, int ix, int iy);
+
     /*! Determine the size of a buffer needed to hold the data array
      *  @return number of doubles
      */

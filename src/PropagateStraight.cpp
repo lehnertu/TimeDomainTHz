@@ -60,6 +60,9 @@ int main(int argc, char* argv[])
     Screen *source = new Screen(filename);
     // print report
     source->writeReport(&cout);
+    source->writeTraceReport(&cout, 0, 0);
+    source->writeTraceReport(&cout, source->get_Nx()/2,source->get_Ny()/2);
+
     // compute the derivatives of the source fields
     std::cout << "computing derivatives of source field..." << std::endl;
     source->computeDerivatives();
@@ -70,12 +73,14 @@ int main(int argc, char* argv[])
     // source->writeFieldHDF5("Gaussian_51_dx.h5");
     Vector origin = source->get_Center();
     FieldTrace source_trace = source->get_trace(source->get_Nx()/2,source->get_Ny()/2);
+    double source_t0 = source_trace.get_t0();
+    int source_Nt = source_trace.get_N();
 
     // define the target screen
-    double distance = 2.0 * 1.25751;
+    double distance = 1.2575;
     int Nx = 51;
     int Ny = 51;
-    int Nt = source_trace.get_N();
+    int Nt = 800;
     double dt = source_trace.get_dt();
     Screen *target = new Screen(
         Nx, Ny, Nt,
@@ -84,6 +89,10 @@ int main(int argc, char* argv[])
         source->get_Center() + Vector(0.0,0.0,distance) );
     target->writeReport(&cout);
 
+    // the propagation direction is given by the screen centers
+    Vector prop_dir = target->get_Center() - source->get_Center();
+    prop_dir.normalize();
+    
     // compute the source beam propagated to the target screen
     time_t start_t;
     time(&start_t);
@@ -101,6 +110,8 @@ int main(int argc, char* argv[])
         {
             std::cout << "computing propagated source fields on " << omp_get_num_threads() << " parallel threads" << std::endl;
         }
+        // every thread has its own trace to compute
+        FieldTrace target_trace(0.0,dt,Nt);
         #pragma omp for
         for (int i=0; i<Nx*Ny; i++)
         {
@@ -108,11 +119,33 @@ int main(int argc, char* argv[])
             int ix = i/Ny;
             int iy = i - ix*Ny;
             Vector pos = target->get_point(ix,iy);
-            double delta = (pos-origin).norm()/SpeedOfLight;
+            // the target trace timing is set by the distance from the source plane
+            double delta = dot((pos-origin),prop_dir)/SpeedOfLight;
             // if the traces have different length delta has to be adjusted
             // to align the center and not the beginning of the traces
-            FieldTrace target_trace(source_trace.get_t0()+delta,dt,Nt);
-            source->propagate_to(pos, &target_trace);
+            delta += (source_Nt - Nt)/2.0*dt;
+            target_trace.set_t0(source_t0+delta);
+            try
+            {
+                source->propagate_to(pos, &target_trace);
+            }
+            catch(Screen_Zero_exception exc)
+            {
+                #pragma omp critical
+                {
+                    std::cout << "Screen_Zero exception propagating   ";
+                    std::cout << "from (" << exc.ix <<", " << exc.iy << ")   ";
+                    std::cout << "to (" << ix <<", " << iy << ")" << std::endl;
+                    Vector ps = source->get_point(exc.ix,exc.iy);
+                    double ts = source->get_trace(exc.ix,exc.iy).get_t0();
+                    std::cout << "from (" << ps.x << ", " << ps.y << ", " << ps.z << ") " << ts*1e9 << "ns   ";
+                    Vector pt = target->get_point(ix,iy);
+                    double tt = target_trace.get_t0();
+                    std::cout << "to (" << pt.x << ", " << pt.y << ", " << pt.z << ") " << tt*1e9 << "ns   " << std::endl;
+                    std::cout << "source_center_t0=" << source_trace.get_t0() << "  delta=" << delta << std::endl;
+                    throw(-1);
+                }
+            }
             target->set_trace(ix, iy, target_trace);
             // all threads increment the counter
             #pragma omp atomic
@@ -137,7 +170,7 @@ int main(int argc, char* argv[])
     target->writeReport(&cout);
 
     // write the target screen data to file
-    target->writeFieldHDF5("Gaussian_51_Straight_51.h5");
+    target->writeFieldHDF5("Tilted_2001_Straight_51.h5");
     
     delete source;
     delete target;

@@ -124,15 +124,14 @@ Screen::Screen(std::string filename)
         H5P_DEFAULT,			// data transfer properties
         field);
     // transfer the data into the internal data structures
-    FieldTrace zero_trace(0.0, dt, Nt);
-    std::vector<FieldTrace> zero_column(Ny, zero_trace);
+    FieldTrace trace(0.0, dt, Nt);
+    std::vector<FieldTrace> zero_column(Ny, trace);
     A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
     ElMagField *buf = field;
     double *pt0 = t0_buf;
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {   
-            FieldTrace trace(&zero_trace);
             trace.set_t0(*pt0++);
             trace.set(buf,Nt);
             buf += Nt;
@@ -184,11 +183,13 @@ void Screen::writeReport(std::ostream *st)
     *st << "TimeDomainTHz - Screen" << std::endl << std::endl;
     *st << "Nx=" << Nx << "  Ny=" << Ny << "  Nt=" << get_Nt() << std::endl;
     st->precision(4);
+    *st << "center = (" << Center.x << ", " << Center.y << ", " << Center.z << ") m" << std::endl;
     *st << "e_x = (" << xVec.x*1.0e3 << ", " << xVec.y*1.0e3 << ", " << xVec.z*1.0e3 << ") mm" << std::endl;
     *st << "e_y = (" << yVec.x*1.0e3 << ", " << yVec.y*1.0e3 << ", " << yVec.z*1.0e3 << ") mm" << std::endl;
     *st << "n   = (" << Normal.x << ", " << Normal.y << ", " << Normal.z << ")" << std::endl;
     st->precision(6);
     *st << "dA  = " << dA*1.0e6 << " mm²" << std::endl;
+    *st << "t0  = " << A[Nx/2][Ny/2].get_t0()*1.0e9 << " ns" << std::endl;
     *st << "dt  = " << get_dt()*1.0e9 << " ns" << std::endl << std::endl;
     double pp=0.0;
     Vector Sp;
@@ -209,6 +210,15 @@ void Screen::writeReport(std::ostream *st)
     st->precision(6);
     *st << "peak energy density (" << pix << ", " << piy << ") = " << pp << " J/m²" << std::endl;
     *st << "Energy incident on screen = " << totalEnergy()*1.0e6 << " µJ" << std::endl << std::endl;
+}
+
+void Screen::writeTraceReport(std::ostream *st, int ix, int iy)
+{
+    *st << "trace (" << ix << ", " << iy << ")  ";
+    Vector p = get_point(ix,iy);
+    *st << "pos=(" << p.x << ", " << p.y << ", " << p.z << ") m   ";
+    *st << "t0=" << A[ix][iy].get_t0()*1e9 << " ns  ";
+    *st << "P=" << A[ix][iy].Poynting().norm() << " J/m²" << std::endl;
 }
 
 void Screen::bufferArray(double *buffer)
@@ -241,15 +251,30 @@ FieldTrace Screen::dx_A(int ix, int iy)
     if (ix<0 || ix>=Nx) throw(Screen_IndexOutOfRange());
     if (iy<0 || iy>=Ny) throw(Screen_IndexOutOfRange());
     double dX = xVec.norm();
-    FieldTrace trace = A[ix][iy];
+    FieldTrace center = A[ix][iy];
+    // the neighbouring traces are resampled to the timing defined by the center trace
+    FieldTrace right = center;
+    FieldTrace left = center;
+    // the return trace
+    FieldTrace trace = center;
     if (ix==0)
-        trace = (A[1][iy] - A[0][iy]) / dX;
+    {
+        A[1][iy].retard(0.0, &right);
+        trace = (right-center) / dX;
+    }
     else 
     {
         if (ix==Nx-1)
-            trace = (A[Nx-1][iy] - A[Nx-2][iy]) / dX;
+        {
+            A[Nx-2][iy].retard(0.0, &left);
+            trace = (center-left) / dX;
+        }
         else
-            trace = (A[ix+1][iy] - A[ix-1][iy]) / (dX*2.0);
+        {
+            A[ix+1][iy].retard(0.0, &right);
+            A[ix-1][iy].retard(0.0, &left);
+            trace = (right-left) / (dX*2.0);
+        };
     }
     return trace;
 }
@@ -259,15 +284,30 @@ FieldTrace Screen::dy_A(int ix, int iy)
     if (ix<0 || ix>=Nx) throw(Screen_IndexOutOfRange());
     if (iy<0 || iy>=Ny) throw(Screen_IndexOutOfRange());
     double dY = yVec.norm();
-    FieldTrace trace = A[ix][iy];
+    FieldTrace center = A[ix][iy];
+    // the neighbouring traces are resampled to the timing defined by the center trace
+    FieldTrace right = center;
+    FieldTrace left = center;
+    // the return trace
+    FieldTrace trace = center;
     if (iy==0)
-        trace = (A[ix][1] - A[ix][0]) / dY;
+    {
+        A[ix][1].retard(0.0, &right);
+        trace = (right-center) / dY;
+    }
     else 
     {
         if (iy==Ny-1)
-            trace = (A[ix][Ny-1] - A[ix][Ny-2]) / dY;
+        {
+            A[ix][Ny-2].retard(0.0, &left);
+            trace = (center-left) / dY;
+        }
         else
-            trace = (A[ix][iy+1] - A[ix][iy-1]) / (dY*2.0);
+        {
+            A[ix][iy+1].retard(0.0, &right);
+            A[ix][iy-1].retard(0.0, &left);
+            trace = (right-left) / (dY*2.0);
+        };
     }
     return trace;
 }
@@ -383,6 +423,9 @@ void Screen::computeDerivatives()
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {
+            // this is necessary to set the correct timing
+            trace = A[ix][iy];
+            // now set the field data
             for (int it=0; it<Nt; it++)
             {
                 Vector E = Vector(*pEx++,*pEy++,*pEz++);
@@ -418,25 +461,51 @@ void Screen::propagate_to(Vector target_pos, FieldTrace *target_trace)
     // this is the result sum
     FieldTrace trace(target_trace);
     trace.zero();
+    // this is the source trace
+    FieldTrace t1(A[0][0]);
     // this is the component to be added
     FieldTrace t2(target_trace);
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
-        {
+        {   
             Vector source = get_point(ix,iy);
             Vector RVec = target_pos - source;
             double R = RVec.norm();
             double R2 = R*R;
             double R3 = R2*R;
-            FieldTrace t1 = A[ix][iy];
-            t1.retarded(R/SpeedOfLight, &t2);
-            trace += t2 * (dot(RVec,Normal)/R3);
-            t1 = dt_A[ix][iy];
-            t1.retarded(R/SpeedOfLight, &t2);
-            trace += t2 * (dot(RVec,Normal)/(R2*SpeedOfLight));
-            t1 = dn_A[ix][iy];
-            t1.retarded(R/SpeedOfLight, &t2);
-            trace += t2 * (-1.0/R);
+            try
+            {
+                t1 = A[ix][iy];
+                t1.retard(R/SpeedOfLight, &t2);
+                trace += t2 * (dot(RVec,Normal)/R3);
+            }
+            catch(FieldTrace_Zero exc)
+            {
+                std::cout << "FieldTrace first term zero exception at ix=" << ix << "  iy=" << iy << std::endl;
+                throw(Screen_Zero_exception(ix,iy));
+            }
+            try
+            {
+                t1 = dt_A[ix][iy];
+                t1.retard(R/SpeedOfLight, &t2);
+                trace += t2 * (dot(RVec,Normal)/(R2*SpeedOfLight));
+            }
+            catch(FieldTrace_Zero exc)
+            {
+                std::cout << "FieldTrace second term zero exception at ix=" << ix << "  iy=" << iy << std::endl;
+                throw(Screen_Zero_exception(ix,iy));
+            }
+            try
+            {
+                t1 = dn_A[ix][iy];
+                t1.retard(R/SpeedOfLight, &t2);
+                trace += t2 * (-1.0/R);
+            }
+            catch(FieldTrace_Zero exc)
+            {
+                std::cout << "FieldTrace third term zero exception at ix=" << ix << "  iy=" << iy << std::endl;
+                throw(Screen_Zero_exception(ix,iy));
+            }
         }    
     *target_trace = trace * dA/(4.0*Pi);
 }

@@ -182,8 +182,8 @@ FieldTrace FieldTrace::operator/ (double factor)
 FieldTrace FieldTrace::operator+ (FieldTrace other)
 {
     if (N != other.N) throw(FieldTrace_SizeMismatch());
-    if (t0 != other.t0) throw(FieldTrace_SizeMismatch());
-    if (dt != other.dt) throw(FieldTrace_SizeMismatch());
+    if (t0 != other.t0) throw(FieldTrace_TimeMismatch());
+    if (dt != other.dt) throw(FieldTrace_TimeMismatch());
     FieldTrace temp = *this;
     for (int i=0; i<N; i++)
         temp.trace[i] = trace[i] + other.trace[i];
@@ -193,8 +193,8 @@ FieldTrace FieldTrace::operator+ (FieldTrace other)
 FieldTrace& FieldTrace::operator+= (FieldTrace other)
 {
     if (N != other.N) throw(FieldTrace_SizeMismatch());
-    if (t0 != other.t0) throw(FieldTrace_SizeMismatch());
-    if (dt != other.dt) throw(FieldTrace_SizeMismatch());
+    if (t0 != other.t0) throw(FieldTrace_TimeMismatch());
+    if (dt != other.dt) throw(FieldTrace_TimeMismatch());
     for (int i=0; i<N; i++)
         trace[i] += other.trace[i];
     return (*this);
@@ -203,8 +203,8 @@ FieldTrace& FieldTrace::operator+= (FieldTrace other)
 FieldTrace FieldTrace::operator- (FieldTrace other)
 {
     if (N != other.N) throw(FieldTrace_SizeMismatch());
-    if (t0 != other.t0) throw(FieldTrace_SizeMismatch());
-    if (dt != other.dt) throw(FieldTrace_SizeMismatch());
+    if (t0 != other.t0) throw(FieldTrace_TimeMismatch());
+    if (dt != other.dt) throw(FieldTrace_TimeMismatch());
     FieldTrace temp = *this;
     for (int i=0; i<N; i++)
         temp.trace[i] = trace[i] - other.trace[i];
@@ -266,7 +266,7 @@ FieldTrace FieldTrace::derivative()
     return(temp);
 }
 
-void FieldTrace::retarded(double delta_t, FieldTrace *target)
+void FieldTrace::retard(double delta_t, FieldTrace *target)
 {
     for (int i=0; i<target->get_N(); i++)
     {
@@ -275,8 +275,9 @@ void FieldTrace::retarded(double delta_t, FieldTrace *target)
     };
     if (target->Poynting().norm()==0.0)
     {
-        std::cout << "retard t0=" << t0 << " N=" << N << " P=" << Poynting().norm() << std::endl;
-        std::cout << "to     t0=" << target->get_t0() << " N=" << target->get_N()<< " P=" << target->Poynting().norm() << std::endl;
+        std::cout << "retard from t0=" << t0 << " N=" << N << " P=" << Poynting().norm() << std::endl;
+        std::cout << "      by delta=" << delta_t << "s" << std::endl;
+        std::cout << "retard   to t0=" << target->get_t0() << " N=" << target->get_N()<< " P=" << target->Poynting().norm() << std::endl;
         throw(FieldTrace_Zero());
     };
 }

@@ -86,17 +86,21 @@ int main(int argc, char* argv[])
     
     // define the target screen
     double distance = 1.25751;
-    int Nx = 201;
-    int Ny = 25;
+    int Nx = 2001;
+    int Ny = 51;
     int Nt = 500;
     double dt = source_trace.get_dt();
     Screen *target = new Screen(
         Nx, Ny, Nt,
-        Vector(0.0005,0.0,0.0005),
-        Vector(0.0,-0.005,0.0),
+        Vector(0.00005,0.0,0.00005),
+        Vector(0.0,-0.0025,0.0),
         source->get_Center() + Vector(0.0,0.0,distance) );
     target->writeReport(&cout);
-        
+
+    // the propagation direction is given by the screen centers
+    Vector prop_dir = target->get_Center() - source->get_Center();
+    prop_dir.normalize();
+    
     // compute the source beam propagated to the target screen
     time_t start_t;
     time(&start_t);
@@ -114,6 +118,8 @@ int main(int argc, char* argv[])
         {
             std::cout << "computing propagated source fields on " << omp_get_num_threads() << " parallel threads" << std::endl;
         }
+        // every thread has its own trace to compute
+        FieldTrace target_trace(0.0,dt,Nt);
         #pragma omp for
         for (int i=0; i<Nx*Ny; i++)
         {
@@ -121,11 +127,12 @@ int main(int argc, char* argv[])
             int ix = i/Ny;
             int iy = i - ix*Ny;
             Vector pos = target->get_point(ix,iy);
-            double delta = (pos-origin).norm()/SpeedOfLight;
+            // the target trace timing is set by the distance from the source plane
+            double delta = dot((pos-origin),prop_dir)/SpeedOfLight;
             // if the traces have different length delta has to be adjusted
             // to align the center and not the beginning of the traces
             delta += (source_Nt - Nt)/2.0*dt;
-            FieldTrace target_trace(source_t0+delta,dt,Nt);
+            target_trace.set_t0(source_t0+delta);
             source->propagate_to(pos, &target_trace);
             target->set_trace(ix, iy, target_trace);
             // all threads increment the counter
@@ -151,7 +158,7 @@ int main(int argc, char* argv[])
     target->writeReport(&cout);
 
     // write the target screen data to file
-    target->writeFieldHDF5("Gaussian_25_Tilted_201x25.h5");
+    target->writeFieldHDF5("Tilted_2001x51.h5");
     
     delete source;
     delete target;

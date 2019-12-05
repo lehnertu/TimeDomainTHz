@@ -70,6 +70,7 @@ print()
 print("center = (%d, %d)" % (xcenter,ycenter))
 centerposition = pos[xcenter][ycenter]
 print("center position = %s" % centerposition)
+print("start time = %.4f ns" %(1e9*t0[xcenter][ycenter]))
 
 Ex = onaxis[:,0]
 Ey = onaxis[:,1]
@@ -123,6 +124,7 @@ if args.xy != None:
     print("index = (%d, %d)" % (xi,yi))
     position = pos[xi][yi]
     print("off-axis position = %s" % position)
+    print("start time = %.4f ns" %(1e9*t0[xi][yi]))
 
     Ex = offaxis[:,0]
     Ey = offaxis[:,1]

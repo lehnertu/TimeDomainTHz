@@ -8,5 +8,5 @@ module load gcc
 module load hdf5
 
 cd $rundir
-$basedir/build/TiltedScreen Gaussian_51.h5
+$basedir/build/PropagateStraight Tilted_2001x51.h5
 

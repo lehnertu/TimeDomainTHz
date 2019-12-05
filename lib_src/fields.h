@@ -91,6 +91,7 @@ private:
 
 /*  Assignments of field traces may go wrong -> throws an exception */
 class FieldTrace_SizeMismatch { };
+class FieldTrace_TimeMismatch { };
 class FieldTrace_IndexOutOfRange { };
 class FieldTrace_Zero { };
 
@@ -199,7 +200,7 @@ public:
      *  This is usually an indication for the time frame of the retarded trace
      *  not overlaping with the retarded source fields.
      */
-    void retarded(double delta_t, FieldTrace *target);
+    void retard(double delta_t, FieldTrace *target);
 
 private:
 
