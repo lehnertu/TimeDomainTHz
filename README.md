@@ -23,20 +23,7 @@ file.hdf5
         - array Nx*Ny*Nt*6 double -- FieldTrace[Nx,Ny]
         - no attributes 
 
-DONE:
-FieldTrace::*
-Screen::Screen(std::string filename)
-void Screen::propagate_to(Vector target_pos, FieldTrace *target_trace)
-void Screen::writeFieldHDF5(std::string filename)
-GaussianWavePacket
-PropagateStraight
-TiltedScreen
-plot_Screen_TD.py
-plot_PowerDensity.py
-TimeDomainField.py
+BUG:
 
-TODO:
-FieldTrace Screen::dx_A(int ix, int iy)
-FieldTrace Screen::dy_A(int ix, int iy)
-void Screen::computeDerivatives()
-
+- intensity too large (factor sqrt(2)) when propagating from angled screen
+- large longitudinal E field when propagating from angled screen
