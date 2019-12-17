@@ -35,6 +35,7 @@ Screen::Screen(
     yVec = yVec_p;
     Normal = cross(xVec,yVec);
     dA = Normal.norm();
+    if (dot(xVec,yVec)>1e-6*dA) throw(Screen_NonOrthogonal());
     Normal.normalize();
     Center = center_p;
     FieldTrace zero_trace(0.0,0.0,Nt_p);
@@ -83,6 +84,7 @@ Screen::Screen(std::string filename)
     yVec = (pos01-pos00)/(double)(Ny-1);
     Normal = cross(xVec,yVec);
     dA = Normal.norm();
+    if (dot(xVec,yVec)>1e-6*dA) throw(Screen_NonOrthogonal());
     Normal.normalize();
     Center = (pos11+pos00)*0.5;
     delete pos;
@@ -314,86 +316,98 @@ FieldTrace Screen::dy_A(int ix, int iy)
 
 void Screen::computeDerivatives()
 {
+    int Nt = A[0][0].get_N();
+    FieldTrace trace(0.0,0.0,Nt);
+    // All computations are done in the screen-local reference frame.
+    // Is is assumed that (xVec, yVec, Normal) form a right-handed orthogonal reference frame.
+    // Components Ex, Bx are those in the xVec direction (unit vector ex)
+    // and all other components accordingly
+    Vector ex = xVec;
+    ex.normalize();
+    Vector ey = yVec;
+    ey.normalize();
+    Vector ez = Normal;
+    // declare some pointers needed to copy field components
+    double *pEx, *pEy, *pEz, *pBx, *pBy, *pBz;
     // compute the time-derivatives for all traces
-    // pragma omp parallel for
+    // this derivative is stored in the global reference frame
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
             dt_A[ix][iy] = A[ix][iy].derivative();
-    // compute the normal derivatives using the Maxwell equations
-    // this is the drivative along the Normal direction (in the screen-local frame)
-    // is is assumed that (xVec, yVec, Normal) form a right-handed orthogonal reference frame
-    int Nt = A[0][0].get_N();
-    FieldTrace trace(0.0,0.0,Nt);
-    double *pEx, *pEy, *pEz, *pBx, *pBy, *pBz;
-    double *dx_Ex = new double[Nx*Ny*Nt];
-    pEx = dx_Ex;
-    double *dx_Ez = new double[Nx*Ny*Nt];
-    pEz = dx_Ez;
-    double *dx_Bx = new double[Nx*Ny*Nt];
-    pBx = dx_Bx;
-    double *dx_Bz = new double[Nx*Ny*Nt];
-    pBz = dx_Bz;
-    // this is not parallelizable because the pointers are used by all threads
-    // pragma omp parallel for private(trace)
-    for (int ix=0; ix<Nx; ix++)
-        for (int iy=0; iy<Ny; iy++)
-        {
-            trace = dx_A(ix,iy);
-            for (int it=0; it<Nt; it++)
-            {
-                ElMagField f = trace.get_field(it);
-                *pEx++ = f.E().x;
-                *pEz++ = f.E().z;
-                *pBx++ = f.B().x;
-                *pBz++ = f.B().z;
-            }
-        };
-    double *dy_Ey = new double[Nx*Ny*Nt];
-    pEy = dy_Ey;
-    double *dy_Ez = new double[Nx*Ny*Nt];
-    pEz = dy_Ez;
-    double *dy_By = new double[Nx*Ny*Nt];
-    pBy = dy_By;
-    double *dy_Bz = new double[Nx*Ny*Nt];
-    pBz = dy_Bz;
-    // this is not parallelizable because the pointers are used by all threads
-    // pragma omp parallel for private(trace)
-    for (int ix=0; ix<Nx; ix++)
-        for (int iy=0; iy<Ny; iy++)
-        {
-            trace = dy_A(ix,iy);
-            for (int it=0; it<Nt; it++)
-            {
-                ElMagField f = trace.get_field(it);
-                *pEy++ = f.E().y;
-                *pEz++ = f.E().z;
-                *pBy++ = f.B().y;
-                *pBz++ = f.B().z;
-            }
-        };
+    // compute the screen-local components of the time derivatives
     double *dt_Ex = new double[Nx*Ny*Nt];
-    pEx = dt_Ex;
     double *dt_Ey = new double[Nx*Ny*Nt];
-    pEy = dt_Ey;
     double *dt_Bx = new double[Nx*Ny*Nt];
-    pBx = dt_Bx;
     double *dt_By = new double[Nx*Ny*Nt];
+    pEx = dt_Ex;
+    pEy = dt_Ey;
+    pBx = dt_Bx;
     pBy = dt_By;
-    // this is not parallelizable because the pointers are used by all threads
-    // pragma omp parallel for private(trace)
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {
+            // here the components of the field are in global coordinates
             trace = dt_A[ix][iy];
+            // translate to screen-local components
             for (int it=0; it<Nt; it++)
             {
                 ElMagField f = trace.get_field(it);
-                *pEx++ = f.E().x;
-                *pEy++ = f.E().y;
-                *pBx++ = f.B().x;
-                *pBy++ = f.B().y;
+                *pEx++ = dot(f.E(),ex);
+                *pEy++ = dot(f.E(),ey);
+                *pBx++ = dot(f.B(),ex);
+                *pBy++ = dot(f.B(),ey);
             }
         };
+    // Compute the derivatives along the xVec axis
+    double *dx_Ex = new double[Nx*Ny*Nt];
+    double *dx_Ez = new double[Nx*Ny*Nt];
+    double *dx_Bx = new double[Nx*Ny*Nt];
+    double *dx_Bz = new double[Nx*Ny*Nt];
+    pEx = dx_Ex;
+    pEz = dx_Ez;
+    pBx = dx_Bx;
+    pBz = dx_Bz;
+    for (int ix=0; ix<Nx; ix++)
+        for (int iy=0; iy<Ny; iy++)
+        {
+            // here the components of the field are in global coordinates
+            trace = dx_A(ix,iy);
+            // translate to screen-local components
+            for (int it=0; it<Nt; it++)
+            {
+                ElMagField f = trace.get_field(it);
+                *pEx++ = dot(f.E(),ex);
+                *pEz++ = dot(f.E(),ez);
+                *pBx++ = dot(f.B(),ex);
+                *pBz++ = dot(f.B(),ez);
+            }
+        };
+    // Compute the derivatives along the yVec axis
+    double *dy_Ey = new double[Nx*Ny*Nt];
+    double *dy_Ez = new double[Nx*Ny*Nt];
+    double *dy_By = new double[Nx*Ny*Nt];
+    double *dy_Bz = new double[Nx*Ny*Nt];
+    pEy = dy_Ey;
+    pEz = dy_Ez;
+    pBy = dy_By;
+    pBz = dy_Bz;
+    for (int ix=0; ix<Nx; ix++)
+        for (int iy=0; iy<Ny; iy++)
+        {
+            // here the components of the field are in global coordinates
+            trace = dy_A(ix,iy);
+            // translate to screen-local components
+            for (int it=0; it<Nt; it++)
+            {
+                ElMagField f = trace.get_field(it);
+                *pEy++ = dot(f.E(),ey);
+                *pEz++ = dot(f.E(),ez);
+                *pBy++ = dot(f.B(),ey);
+                *pBz++ = dot(f.B(),ez);
+            }
+        };
+    // Compute the ez derivatives using the Maxwell equations in screen-local coordinates.
+    // This is the drivative along the Normal direction (in the screen-local frame).
     double *dz_Ex = new double[Nx*Ny*Nt];
     double *dz_Ey = new double[Nx*Ny*Nt];
     double *dz_Ez = new double[Nx*Ny*Nt];
@@ -401,8 +415,6 @@ void Screen::computeDerivatives()
     double *dz_By = new double[Nx*Ny*Nt];
     double *dz_Bz = new double[Nx*Ny*Nt];
     double cSquared = SpeedOfLight*SpeedOfLight;
-    // this is not parallelizable because the pointers are used by all threads
-    // pragma omp parallel for private(trace)
     for (int i=0; i<Nx*Ny*Nt; i++)
     {
         dz_Ex[i] = dx_Ez[i] - dt_By[i];
@@ -412,14 +424,13 @@ void Screen::computeDerivatives()
         dz_By[i] = dy_Bz[i] - dt_Ex[i]/cSquared;
         dz_Bz[i] = -dx_Bx[i] - dy_By[i];
     };
+    // Transform the normal derivatives back to global coordinates
     pEx = dz_Ex;
     pEy = dz_Ey;
     pEz = dz_Ez;
     pBx = dz_Bx;
     pBy = dz_By;
     pBz = dz_Bz;
-    // this is not parallelizable because the pointers are used by all threads
-    // pragma omp parallel for
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {
@@ -428,12 +439,12 @@ void Screen::computeDerivatives()
             // now set the field data
             for (int it=0; it<Nt; it++)
             {
-                Vector E = Vector(*pEx++,*pEy++,*pEz++);
-                Vector B = Vector(*pBx++,*pBy++,*pBz++);
+                Vector E = ex * (*pEx++) + ey * (*pEy++) + ez * (*pEz++);
+                Vector B = ex * (*pBx++) + ey * (*pBy++) + ez * (*pBz++);
                 ElMagField f = ElMagField(E,B);
                 trace.set(it,f);
             }
-            dn_A[ix][iy] = trace*(-1.0);
+            dn_A[ix][iy] = trace;
         };
     delete dx_Ex;
     delete dx_Ez;

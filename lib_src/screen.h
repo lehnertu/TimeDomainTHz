@@ -26,6 +26,8 @@
 #include "vector.h"
 #include "fields.h"
 
+/*  Grid vectors are not orthogonal to each other -> throw an exception */
+class Screen_NonOrthogonal { };
 /*  Memory allocation may go wrong -> throw an exception */
 class Screen_MemoryAllocationError { };
 /*  Assignments of field traces may go wrong -> throw an exception */
@@ -60,8 +62,10 @@ public:
      *  @param Nx number of grid cells in xVec direction
      *  @param Nt number of samples in time
      *  @param xVec defines x-axis of grid spacing
-     *  @param yVec defines y-axis of grid spacing (needs not to be perpendicular to xVec)
+     *  @param yVec defines y-axis of grid spacing
      *  @param Center center point of the screen
+     *
+     *  xVec and yVec are restricted to be orthogonal.
      */
     Screen(
         int Nx, int Ny, int Nt,

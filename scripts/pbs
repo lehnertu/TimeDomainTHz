@@ -1,9 +1,9 @@
-#PBS -N TDT
+#PBS -N TDT-3
 #PBS -q default
 #PBS -l nodes=1:ppn=64
 #PBS -d /bigdata/fwke/lehnertu/TimeDomainTHz
-#PBS -e /bigdata/fwke/lehnertu/TimeDomainTHz/pbs.error
-#PBS -o /bigdata/fwke/lehnertu/TimeDomainTHz/pbs.output
+#PBS -e /bigdata/fwke/lehnertu/TimeDomainTHz/pbs3.error
+#PBS -o /bigdata/fwke/lehnertu/TimeDomainTHz/pbs3.output
 #PBS -l cput=768:00:00
 #PBS -l walltime=12:00:00
 $HOME/TimeDomainTHz/scripts/run_TDT

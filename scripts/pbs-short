@@ -1,0 +1,10 @@
+#PBS -N TDT
+#PBS -q short
+#PBS -l nodes=1:ppn=16
+#PBS -d /bigdata/fwke/lehnertu/TimeDomainTHz
+#PBS -e /bigdata/fwke/lehnertu/TimeDomainTHz/pbs-short.error
+#PBS -o /bigdata/fwke/lehnertu/TimeDomainTHz/pbs-short.output
+#PBS -l cput=4:00:00
+#PBS -l walltime=00:15:00
+$HOME/TimeDomainTHz/scripts/run_TDT_short
+

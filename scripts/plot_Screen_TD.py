@@ -86,7 +86,28 @@ SVec = np.cross(EVec, BVec) / mu0
 t = 1e9*np.linspace(t0[xcenter][ycenter],t0[xcenter][ycenter]+(nots-1)*dt,nots)
 print("on axis energy flow density = %s µJ/m²" % (1e6*SVec.sum(axis=0)*dt))
 
-# first figure with the time-trace of the fields on axis
+if args.xy != None:
+
+    print("index = (%d, %d)" % (xi,yi))
+    position = pos[xi][yi]
+    print("off-axis position = %s" % position)
+    print("start time = %.4f ns" %(1e9*t0[xi][yi]))
+
+    Ex = offaxis[:,0]
+    Ey = offaxis[:,1]
+    Ez = offaxis[:,2]
+    Bx = offaxis[:,3]
+    By = offaxis[:,4]
+    Bz = offaxis[:,5]
+
+    EVec = np.array([Ex, Ey, Ez]).transpose()
+    BVec = np.array([Bx, By, Bz]).transpose()
+    # Poynting vector in V/m * (N/(A m)) / (N/A²) = W/m²
+    SVec = np.cross(EVec, BVec) / mu0
+    t = 1e9*np.linspace(t0[xi][yi],t0[xi][yi]+(nots-1)*dt,nots)
+    print("off axis energy flow density = %s µJ/m²" % (1e6*SVec.sum(axis=0)*dt))
+
+# prepage the plot
 
 left, width = 0.15, 0.80
 rect1 = [left, 0.55, width, 0.40]  #left, bottom, width, height
@@ -95,6 +116,8 @@ fig = plt.figure(1,figsize=(12,9))
 
 ax1 = fig.add_axes(rect1)
 ax4 = fig.add_axes(rect2, sharex=ax1)
+
+# plot the time-trace of the fields
 
 l1 = ax1.plot(t, Ex, "r-", label=r'$E_x$')
 l2 = ax1.plot(t, Ey, "b-", label=r'$E_y$')
@@ -118,56 +141,5 @@ lines = l4 + l5 +l6
 labels = [l.get_label() for l in lines]
 ax4.legend(lines,labels,loc='upper right')
 ax4.grid(True)
-
-if args.xy != None:
-
-    print("index = (%d, %d)" % (xi,yi))
-    position = pos[xi][yi]
-    print("off-axis position = %s" % position)
-    print("start time = %.4f ns" %(1e9*t0[xi][yi]))
-
-    Ex = offaxis[:,0]
-    Ey = offaxis[:,1]
-    Ez = offaxis[:,2]
-    Bx = offaxis[:,3]
-    By = offaxis[:,4]
-    Bz = offaxis[:,5]
-
-    EVec = np.array([Ex, Ey, Ez]).transpose()
-    BVec = np.array([Bx, By, Bz]).transpose()
-    # Poynting vector in V/m * (N/(A m)) / (N/A²) = W/m²
-    SVec = np.cross(EVec, BVec) / mu0
-    t = 1e9*np.linspace(t0[xi][yi],t0[xi][yi]+(nots-1)*dt,nots)
-    print("off axis energy flow density = %s µJ/m²" % (1e6*SVec.sum(axis=0)*dt))
-
-    # second figure with the time-trace of the fields off axis
-
-    fig2 = plt.figure(2,figsize=(12,9))
-    
-    ax21 = fig2.add_axes(rect1)
-    ax24 = fig2.add_axes(rect2, sharex=ax21)
-    
-    l21 = ax21.plot(t, Ex, "r-", label=r'$E_x$')
-    l22 = ax21.plot(t, Ey, "b-", label=r'$E_y$')
-    l23 = ax21.plot(t, Ez, "g-", label=r'$E_z$')
-    
-    ax21.set_ylabel(r'$E$ [V/m]')
-    lines = l21 + l22 + l23
-    labels = [l.get_label() for l in lines]
-    ax21.legend(lines,labels,loc='upper right')
-    for label in ax21.get_xticklabels():
-        label.set_visible(False)
-    ax21.grid(True)
-
-    l24 = ax24.plot(t, Bx, "r-", label=r'$B_x$')
-    l25 = ax24.plot(t, By, "b-", label=r'$B_y$')
-    l26 = ax24.plot(t, Bz, "g-", label=r'$B_z$')
-    
-    ax24.set_ylabel(r'$B$ [T]')
-    ax24.set_xlabel(r't [ns]')
-    lines = l24 + l25 +l26
-    labels = [l.get_label() for l in lines]
-    ax24.legend(lines,labels,loc='upper right')
-    ax24.grid(True)
 
 plt.show()

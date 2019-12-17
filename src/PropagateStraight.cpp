@@ -50,14 +50,15 @@ int main(int argc, char* argv[])
     std::cout << std::endl;
     std::cout << "Propagate to Screen" << std::endl << std::endl;
     
-    // load the input field from a file
-    if (argc<2)
+    if (argc<3)
     {
-        std::cout << "Error - file name parameter required" << std::endl;
+        std::cout << "Usage: PropagateStraight infile outfile" << std::endl;
         return 1;
     }
-    std::string filename(argv[1]);
-    Screen *source = new Screen(filename);
+    std::string infile(argv[1]);
+    std::string outfile(argv[2]);
+    // load the input field from a file
+    Screen *source = new Screen(infile);
     // print report
     source->writeReport(&cout);
     source->writeTraceReport(&cout, 0, 0);
@@ -80,12 +81,12 @@ int main(int argc, char* argv[])
     double distance = 1.2575;
     int Nx = 51;
     int Ny = 51;
-    int Nt = 800;
+    int Nt = 400;
     double dt = source_trace.get_dt();
     Screen *target = new Screen(
         Nx, Ny, Nt,
-        Vector(0.003,0.0,0.0),
-        Vector(0.0,-0.003,0.0),
+        Vector(0.0025,0.0,0.0),
+        Vector(0.0,-0.0025,0.0),
         source->get_Center() + Vector(0.0,0.0,distance) );
     target->writeReport(&cout);
 
@@ -170,7 +171,7 @@ int main(int argc, char* argv[])
     target->writeReport(&cout);
 
     // write the target screen data to file
-    target->writeFieldHDF5("Tilted_2001_Straight_51.h5");
+    target->writeFieldHDF5(outfile);
     
     delete source;
     delete target;
