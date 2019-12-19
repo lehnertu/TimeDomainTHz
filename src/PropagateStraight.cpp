@@ -81,12 +81,12 @@ int main(int argc, char* argv[])
     double distance = 1.2575;
     int Nx = 51;
     int Ny = 51;
-    int Nt = 400;
+    int Nt = 1200;
     double dt = source_trace.get_dt();
     Screen *target = new Screen(
         Nx, Ny, Nt,
-        Vector(0.0025,0.0,0.0),
-        Vector(0.0,-0.0025,0.0),
+        Vector(0.003,0.0,0.0),
+        Vector(0.0,-0.003,0.0),
         source->get_Center() + Vector(0.0,0.0,distance) );
     target->writeReport(&cout);
 

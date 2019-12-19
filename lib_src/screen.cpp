@@ -467,14 +467,13 @@ void Screen::computeDerivatives()
 }
 
 void Screen::propagate_to(Vector target_pos, FieldTrace *target_trace)
-// FieldTrace Screen::propagation(Vector target, double t0_p, int N_p)
 {
     // this is the result sum
     FieldTrace trace(target_trace);
     trace.zero();
     // this is the source trace
     FieldTrace t1(A[0][0]);
-    // this is the component to be added
+    // this is the component to be added to the result trace
     FieldTrace t2(target_trace);
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
@@ -488,7 +487,7 @@ void Screen::propagate_to(Vector target_pos, FieldTrace *target_trace)
             {
                 t1 = A[ix][iy];
                 t1.retard(R/SpeedOfLight, &t2);
-                trace += t2 * (dot(RVec,Normal)/R3);
+                trace += t2 * (-dot(RVec,Normal)/R3);
             }
             catch(FieldTrace_Zero exc)
             {
@@ -499,7 +498,7 @@ void Screen::propagate_to(Vector target_pos, FieldTrace *target_trace)
             {
                 t1 = dt_A[ix][iy];
                 t1.retard(R/SpeedOfLight, &t2);
-                trace += t2 * (dot(RVec,Normal)/(R2*SpeedOfLight));
+                trace += t2 * (-dot(RVec,Normal)/(R2*SpeedOfLight));
             }
             catch(FieldTrace_Zero exc)
             {
@@ -510,7 +509,8 @@ void Screen::propagate_to(Vector target_pos, FieldTrace *target_trace)
             {
                 t1 = dn_A[ix][iy];
                 t1.retard(R/SpeedOfLight, &t2);
-                trace += t2 * (-1.0/R);
+                // TODO: why is this term positive - should be negative
+                trace += t2 * (1.0/R);
             }
             catch(FieldTrace_Zero exc)
             {

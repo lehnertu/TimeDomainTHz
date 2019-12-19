@@ -8,5 +8,9 @@ module load gcc
 module load hdf5
 
 cd $rundir
-$basedir/build/PropagateThird Tilted_2001x51.h5
+$basedir/build/PropagateStraight250 Gaussian_51.h5 Straight250.h5
+$basedir/build/PropagateStraight Gaussian_51.h5 Straight125.h5
+$basedir/build/PropagateStraight Straight125.h5 Straight125_Straight125.h5
+$basedir/build/TiltedScreen Gaussian_51.h5
+$basedir/build/PropagateStraight Tilted_2001x51.h5 Tilted_2001x51_Straight_51.h5
 
