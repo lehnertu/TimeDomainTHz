@@ -42,7 +42,14 @@ Analysis:
 - ghost pulse is constant absolute strength over area
 - gost pulse varies in delay depending on the position (latest far out)
 
-=> problem most likely is the normal derivative
-
 => the formula for the normal derivative is supposed to work on field
-components in the local coordinate system - but global coordinates ar used.
+components in the local coordinate system - but global coordinates are used.
+
+BUGFIX: compute spatial derivatives using screen-local coordinates for the field components
+
+=>  excessive longitudinal components fixed
+    ghost pulses still visible at the edges of the observation screens
+    (likely diffraction artifacts, obscured in regions of greater intensity)
+    intensities are correct
+    BUG: polarity is reversed when comparing a single and a double propagation step
+
