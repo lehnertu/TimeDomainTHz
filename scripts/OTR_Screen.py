@@ -18,7 +18,7 @@ in negative z direction with the transverse axes being
 x-left and y-up.
 """
 
-gamma = 15.0
+gamma = 3.0
 betagamma = np.sqrt(gamma*gamma-1.0)
 beta = np.sqrt(1.0-1.0/(gamma*gamma))
 
@@ -74,17 +74,20 @@ A = np.zeros((Nz,Nx))
 for iz in range(Nz):
     for ix in range(Nx):
         obs_pos = np.array([0.0,x[ix],0.0,z[iz]])
-        mov_F = Mov_F(Mov_X(obs_pos))
-        obs_F = Lorentz_Z.dot(Lorentz_Z.dot(mov_F))
+        local_pos = Mov_X(obs_pos)
+        mov_F = Mov_F(local_pos)
+        obs_F = Inv_Lorentz_Z.dot(Inv_Lorentz_Z.dot(mov_F))
         Ex = obs_F[1,0]*constants.c
         Ey = obs_F[2,0]*constants.c
         Ez = obs_F[3,0]*constants.c
-        A[iz,ix] = np.sqrt(Ex*Ex + Ey*Ey + Ez*Ez)
+        # A[iz,ix] = np.sqrt(Ex*Ex + Ey*Ey + Ez*Ez)
+        A[iz,ix] = np.sqrt(Ex*Ex)
+        # A[iz,ix] = np.sqrt(Ez*Ez)
 
 # plot data
 fig1 = plt.figure(1,figsize=(12,9))
 ax1 = fig1.add_subplot(111)
-plt.contourf(z, x, np.log(A), 15, cmap='CMRmap')
+plt.contourf(z, x, np.transpose(A), 15, cmap='CMRmap')
 plt.title('electric field magnitude [V/m]')
 plt.xlabel('z /m')
 plt.ylabel('x /m')
