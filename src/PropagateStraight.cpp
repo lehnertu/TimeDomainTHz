@@ -50,16 +50,20 @@ int main(int argc, char* argv[])
     std::cout << std::endl;
     std::cout << "Propagate to Screen" << std::endl << std::endl;
     
-    // load the input field from a file
-    if (argc<2)
+    if (argc<3)
     {
-        std::cout << "Error - file name parameter required" << std::endl;
+        std::cout << "Usage: PropagateStraight infile outfile" << std::endl;
         return 1;
     }
-    std::string filename(argv[1]);
-    Screen *source = new Screen(filename);
+    std::string infile(argv[1]);
+    std::string outfile(argv[2]);
+    // load the input field from a file
+    Screen *source = new Screen(infile);
     // print report
     source->writeReport(&cout);
+    source->writeTraceReport(&cout, 0, 0);
+    source->writeTraceReport(&cout, source->get_Nx()/2,source->get_Ny()/2);
+
     // compute the derivatives of the source fields
     std::cout << "computing derivatives of source field..." << std::endl;
     source->computeDerivatives();
@@ -68,13 +72,17 @@ int main(int argc, char* argv[])
     // with modified sources we write the derivatives insted
     // Screen::bufferArray() is changed to deliver dx_A instead of A
     // source->writeFieldHDF5("Gaussian_51_dx.h5");
+    Vector origin = source->get_Center();
+    FieldTrace source_trace = source->get_trace(source->get_Nx()/2,source->get_Ny()/2);
+    double source_t0 = source_trace.get_t0();
+    int source_Nt = source_trace.get_N();
 
     // define the target screen
-    double distance = 2.0 * 1.25751;
+    double distance = 1.2575;
     int Nx = 51;
     int Ny = 51;
-    FieldTrace source_trace = source->get_Trace(0,0);
-    int Nt = source_trace.get_N()+4000;
+    int Nt = 1200;
+    double dt = source_trace.get_dt();
     Screen *target = new Screen(
         Nx, Ny, Nt,
         Vector(0.003,0.0,0.0),
@@ -82,8 +90,11 @@ int main(int argc, char* argv[])
         source->get_Center() + Vector(0.0,0.0,distance) );
     target->writeReport(&cout);
 
+    // the propagation direction is given by the screen centers
+    Vector prop_dir = target->get_Center() - source->get_Center();
+    prop_dir.normalize();
+    
     // compute the source beam propagated to the target screen
-    double target_t0 = source->get_tCenter()+distance/SpeedOfLight-source->get_dt()*(double)Nt/2.0;
     time_t start_t;
     time(&start_t);
     time_t print_time = start_t;
@@ -100,20 +111,43 @@ int main(int argc, char* argv[])
         {
             std::cout << "computing propagated source fields on " << omp_get_num_threads() << " parallel threads" << std::endl;
         }
+        // every thread has its own trace to compute
+        FieldTrace target_trace(0.0,dt,Nt);
         #pragma omp for
         for (int i=0; i<Nx*Ny; i++)
         {
             // we comprise the two loops over ix and iy into one parallel loop
             int ix = i/Ny;
             int iy = i - ix*Ny;
-            /* pragma omp critical
-            {
-                std::cout << "ix = " << ix << "  iy = " << iy << std::endl;
-            };
-            */
             Vector pos = target->get_point(ix,iy);
-            FieldTrace target_trace = source->propagation(pos, target_t0, Nt);
-            target->set_Trace(ix, iy, target_trace);
+            // the target trace timing is set by the distance from the source plane
+            double delta = dot((pos-origin),prop_dir)/SpeedOfLight;
+            // if the traces have different length delta has to be adjusted
+            // to align the center and not the beginning of the traces
+            delta += (source_Nt - Nt)/2.0*dt;
+            target_trace.set_t0(source_t0+delta);
+            try
+            {
+                source->propagate_to(pos, &target_trace);
+            }
+            catch(Screen_Zero_exception exc)
+            {
+                #pragma omp critical
+                {
+                    std::cout << "Screen_Zero exception propagating   ";
+                    std::cout << "from (" << exc.ix <<", " << exc.iy << ")   ";
+                    std::cout << "to (" << ix <<", " << iy << ")" << std::endl;
+                    Vector ps = source->get_point(exc.ix,exc.iy);
+                    double ts = source->get_trace(exc.ix,exc.iy).get_t0();
+                    std::cout << "from (" << ps.x << ", " << ps.y << ", " << ps.z << ") " << ts*1e9 << "ns   ";
+                    Vector pt = target->get_point(ix,iy);
+                    double tt = target_trace.get_t0();
+                    std::cout << "to (" << pt.x << ", " << pt.y << ", " << pt.z << ") " << tt*1e9 << "ns   " << std::endl;
+                    std::cout << "source_center_t0=" << source_trace.get_t0() << "  delta=" << delta << std::endl;
+                    throw(-1);
+                }
+            }
+            target->set_trace(ix, iy, target_trace);
             // all threads increment the counter
             #pragma omp atomic
             counter++;
@@ -137,7 +171,7 @@ int main(int argc, char* argv[])
     target->writeReport(&cout);
 
     // write the target screen data to file
-    target->writeFieldHDF5("Gaussian_25_Straight_51_C.h5");
+    target->writeFieldHDF5(outfile);
     
     delete source;
     delete target;

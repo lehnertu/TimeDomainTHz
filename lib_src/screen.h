@@ -26,6 +26,8 @@
 #include "vector.h"
 #include "fields.h"
 
+/*  Grid vectors are not orthogonal to each other -> throw an exception */
+class Screen_NonOrthogonal { };
 /*  Memory allocation may go wrong -> throw an exception */
 class Screen_MemoryAllocationError { };
 /*  Assignments of field traces may go wrong -> throw an exception */
@@ -34,6 +36,12 @@ class Screen_IndexOutOfRange { };
 class Screen_FileWriteError { };
 /*  Reading an HDF5 file may go wrong -> throw an exception */
 class Screen_FileReadError { };
+/*  further propagate a FieldTrace_Zero exception */
+struct Screen_Zero_exception {
+    int ix;
+    int iy;
+    Screen_Zero_exception(int x, int y) {ix=x; iy=y;};
+};
 
 /*!
  * \class Screen
@@ -54,8 +62,10 @@ public:
      *  @param Nx number of grid cells in xVec direction
      *  @param Nt number of samples in time
      *  @param xVec defines x-axis of grid spacing
-     *  @param yVec defines y-axis of grid spacing (needs not to be perpendicular to xVec)
+     *  @param yVec defines y-axis of grid spacing
      *  @param Center center point of the screen
+     *
+     *  xVec and yVec are restricted to be orthogonal.
      */
     Screen(
         int Nx, int Ny, int Nt,
@@ -75,23 +85,22 @@ public:
      *  these values are not expected to change once constructed */
     int get_Nx() { return Nx; }
     int get_Ny() { return Ny; }
-    int get_Nt() { return A[0][0].get_N(); }
+    int get_Nt() { return get_trace(0,0).get_N(); }
+    double get_dt() { return get_trace(0,0).get_dt(); }
     Vector get_Center()  { return Center; }
     Vector get_Normal()  { return Normal; }
     double get_dA()  { return dA; }
     Vector get_xVec()  { return xVec; }
     Vector get_yVec()  { return yVec; }
-    double get_t0() { return A[0][0].get_t0(); }
-    double get_dt() { return A[0][0].get_dt(); }
-    double get_tCenter() { return A[0][0].get_tCenter(); }
     
     /*! Get the position of one grid cell */
     Vector get_point(int ix, int iy); 
     
-    /*! Get/Set the field trace data for one of the grid cells */
-    FieldTrace get_Trace(int ix, int iy) { return A[ix][iy]; }
+    /*! Get the field trace data for one of the grid cells */
+    FieldTrace get_trace(int ix, int iy);
+
     /*! Set the field trace data for one of the grid cells */
-    void set_Trace(int ix, int iy, FieldTrace trace);
+    void set_trace(int ix, int iy, FieldTrace trace);
     
     /*! Total energy of radiation falling on the screen */
     double totalEnergy();
@@ -102,6 +111,11 @@ public:
      */
     void writeReport(std::ostream *st);
     
+    /*! Write a report of a single field trace
+     *  onto an output stream
+     */
+    void writeTraceReport(std::ostream *st, int ix, int iy);
+
     /*! Determine the size of a buffer needed to hold the data array
      *  @return number of doubles
      */
@@ -126,13 +140,12 @@ public:
 
     /*! Compute the fields propagated to a given point in space.
      *  It is assumed that the normal vector of the source area points outward from the volume of interest.
-     *  The time step of the target trace is the same as that of the screen.
+     *  The time sampling of the target trace is retained as given.
      *  The fields are properly retarded at the target point according to its distance from the source.
-     *  @param target observation position for the target trace
-     *  @param t0 start time of the target trace
-     *  @param N length of the target trace
+     *  @param target_pos observation position for the target trace
+     *  @param target_trace field trace to be overwritten with the result
      */
-    FieldTrace propagation(Vector target, double t0_p, int N_p);
+    void propagate_to(Vector target_pos, FieldTrace *target_trace);
 
     /*! Write the screen data to an HDF5 file */
     void writeFieldHDF5(std::string filename);

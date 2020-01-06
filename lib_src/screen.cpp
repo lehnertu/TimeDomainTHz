@@ -35,6 +35,7 @@ Screen::Screen(
     yVec = yVec_p;
     Normal = cross(xVec,yVec);
     dA = Normal.norm();
+    if (dot(xVec,yVec)>1e-6*dA) throw(Screen_NonOrthogonal());
     Normal.normalize();
     Center = center_p;
     FieldTrace zero_trace(0.0,0.0,Nt_p);
@@ -63,7 +64,7 @@ Screen::Screen(std::string filename)
     if (attr<0) throw(Screen_FileReadError());
     status =  H5Aread(attr, H5T_NATIVE_INT, &Ny);
     if (status<0) throw(Screen_FileReadError());
-    // now we know the size of the dataset - create and fill a buffer
+    // create and fill a buffer
     Vector *pos = new Vector[Nx*Ny];
     status = H5Dread (pos_dataset,
         H5T_NATIVE_DOUBLE, 		// mem type id
@@ -83,29 +84,40 @@ Screen::Screen(std::string filename)
     yVec = (pos01-pos00)/(double)(Ny-1);
     Normal = cross(xVec,yVec);
     dA = Normal.norm();
+    if (dot(xVec,yVec)>1e-6*dA) throw(Screen_NonOrthogonal());
     Normal.normalize();
     Center = (pos11+pos00)*0.5;
     delete pos;
 
+    // open the trace timing dataset
+    hid_t time_dataset = H5Dopen2(file, "ObservationTime", H5P_DEFAULT);
+    if (time_dataset<0) throw(Screen_FileReadError());
+    attr = H5Aopen_name(time_dataset, "Nt");
+    if (attr<0) throw(Screen_FileReadError());
+    int Nt;
+    status =  H5Aread(attr, H5T_NATIVE_INT, &Nt);
+    if (status<0) throw(Screen_FileReadError());
+    attr = H5Aopen_name(time_dataset, "dt");
+    if (attr<0) throw(Screen_FileReadError());
+    double dt;
+    status =  H5Aread(attr, H5T_NATIVE_DOUBLE, &dt);
+    if (status<0) throw(Screen_FileReadError());
+    // create and fill a buffer
+    double *t0_buf = new double[Nx*Ny];
+    status = H5Dread (time_dataset,
+        H5T_NATIVE_DOUBLE, 		// mem type id
+        H5S_ALL, 			    // mem space id
+        H5S_ALL,
+        H5P_DEFAULT,			// data transfer properties
+        t0_buf);
+    if (status<0) throw(Screen_FileReadError());
+    status = H5Dclose(time_dataset);
+    if (status<0) throw(Screen_FileReadError());
+
     // open the field dataset
     hid_t field_dataset = H5Dopen2(file, "ElMagField", H5P_DEFAULT);
     if (field_dataset<0) throw(Screen_FileReadError());
-    int Nt;
-    attr = H5Aopen_name(field_dataset, "NOTS");
-    if (attr<0) throw(Screen_FileReadError());
-    status =  H5Aread(attr, H5T_NATIVE_INT, &Nt);
-    if (status<0) throw(Screen_FileReadError());
-    double t0;
-    attr = H5Aopen_name(field_dataset, "t0");
-    if (attr<0) throw(Screen_FileReadError());
-    status =  H5Aread(attr, H5T_NATIVE_DOUBLE, &t0);
-    if (status<0) throw(Screen_FileReadError());
-    double dt;
-    attr = H5Aopen_name(field_dataset, "dt");
-    if (attr<0) throw(Screen_FileReadError());
-    status =  H5Aread(attr, H5T_NATIVE_DOUBLE, &dt);
-    if (status<0) throw(Screen_FileReadError());
-    // now we know the size of the dataset - create and fill a buffer
+    // create and fill a buffer
     ElMagField *field = new ElMagField[Nx*Ny*Nt];
     status = H5Dread (field_dataset,
         H5T_NATIVE_DOUBLE, 		// mem type id
@@ -114,17 +126,20 @@ Screen::Screen(std::string filename)
         H5P_DEFAULT,			// data transfer properties
         field);
     // transfer the data into the internal data structures
-    FieldTrace trace(t0, dt, Nt);
+    FieldTrace trace(0.0, dt, Nt);
     std::vector<FieldTrace> zero_column(Ny, trace);
     A = std::vector< std::vector<FieldTrace> >(Nx,zero_column);
     ElMagField *buf = field;
+    double *pt0 = t0_buf;
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {   
+            trace.set_t0(*pt0++);
             trace.set(buf,Nt);
             buf += Nt;
             A[ix][iy] = trace;
         }
+    delete t0_buf;
     delete field;
     
     status = H5Fclose (file);
@@ -142,7 +157,14 @@ Vector Screen::get_point(int ix, int iy)
     return Center + xVec*((double)ix-0.5*((double)Nx-1.0)) + yVec*((double)iy-0.5*((double)Ny-1.0));
 }
 
-void Screen::set_Trace(int ix, int iy, FieldTrace trace)
+FieldTrace Screen::get_trace(int ix, int iy)
+{
+    if (ix<0 || ix>=Nx) throw(Screen_IndexOutOfRange());
+    if (iy<0 || iy>=Ny) throw(Screen_IndexOutOfRange());
+    return A[ix][iy];
+}
+
+void Screen::set_trace(int ix, int iy, FieldTrace trace)
 {
     if (ix<0 || ix>=Nx) throw(Screen_IndexOutOfRange());
     if (iy<0 || iy>=Ny) throw(Screen_IndexOutOfRange());
@@ -161,13 +183,16 @@ double Screen::totalEnergy()
 void Screen::writeReport(std::ostream *st)
 {
     *st << "TimeDomainTHz - Screen" << std::endl << std::endl;
-    *st << "Nx=" << Nx << "  Ny=" << Ny << std::endl;
+    *st << "Nx=" << Nx << "  Ny=" << Ny << "  Nt=" << get_Nt() << std::endl;
     st->precision(4);
+    *st << "center = (" << Center.x << ", " << Center.y << ", " << Center.z << ") m" << std::endl;
     *st << "e_x = (" << xVec.x*1.0e3 << ", " << xVec.y*1.0e3 << ", " << xVec.z*1.0e3 << ") mm" << std::endl;
     *st << "e_y = (" << yVec.x*1.0e3 << ", " << yVec.y*1.0e3 << ", " << yVec.z*1.0e3 << ") mm" << std::endl;
     *st << "n   = (" << Normal.x << ", " << Normal.y << ", " << Normal.z << ")" << std::endl;
-    st->precision(4);
-    *st << "dA  = " << dA*1.0e6 << " mm²" << std::endl << std::endl;
+    st->precision(6);
+    *st << "dA  = " << dA*1.0e6 << " mm²" << std::endl;
+    *st << "t0  = " << A[Nx/2][Ny/2].get_t0()*1.0e9 << " ns" << std::endl;
+    *st << "dt  = " << get_dt()*1.0e9 << " ns" << std::endl << std::endl;
     double pp=0.0;
     Vector Sp;
     int pix=-1;
@@ -187,6 +212,15 @@ void Screen::writeReport(std::ostream *st)
     st->precision(6);
     *st << "peak energy density (" << pix << ", " << piy << ") = " << pp << " J/m²" << std::endl;
     *st << "Energy incident on screen = " << totalEnergy()*1.0e6 << " µJ" << std::endl << std::endl;
+}
+
+void Screen::writeTraceReport(std::ostream *st, int ix, int iy)
+{
+    *st << "trace (" << ix << ", " << iy << ")  ";
+    Vector p = get_point(ix,iy);
+    *st << "pos=(" << p.x << ", " << p.y << ", " << p.z << ") m   ";
+    *st << "t0=" << A[ix][iy].get_t0()*1e9 << " ns  ";
+    *st << "P=" << A[ix][iy].Poynting().norm() << " J/m²" << std::endl;
 }
 
 void Screen::bufferArray(double *buffer)
@@ -219,15 +253,30 @@ FieldTrace Screen::dx_A(int ix, int iy)
     if (ix<0 || ix>=Nx) throw(Screen_IndexOutOfRange());
     if (iy<0 || iy>=Ny) throw(Screen_IndexOutOfRange());
     double dX = xVec.norm();
-    FieldTrace trace(get_t0(),get_dt(),get_Nt());
+    FieldTrace center = A[ix][iy];
+    // the neighbouring traces are resampled to the timing defined by the center trace
+    FieldTrace right = center;
+    FieldTrace left = center;
+    // the return trace
+    FieldTrace trace = center;
     if (ix==0)
-        trace = (A[1][iy] - A[0][iy]) / dX;
+    {
+        A[1][iy].retard(0.0, &right);
+        trace = (right-center) / dX;
+    }
     else 
     {
         if (ix==Nx-1)
-            trace = (A[Nx-1][iy] - A[Nx-2][iy]) / dX;
+        {
+            A[Nx-2][iy].retard(0.0, &left);
+            trace = (center-left) / dX;
+        }
         else
-            trace = (A[ix+1][iy] - A[ix-1][iy]) / (dX*2.0);
+        {
+            A[ix+1][iy].retard(0.0, &right);
+            A[ix-1][iy].retard(0.0, &left);
+            trace = (right-left) / (dX*2.0);
+        };
     }
     return trace;
 }
@@ -237,102 +286,128 @@ FieldTrace Screen::dy_A(int ix, int iy)
     if (ix<0 || ix>=Nx) throw(Screen_IndexOutOfRange());
     if (iy<0 || iy>=Ny) throw(Screen_IndexOutOfRange());
     double dY = yVec.norm();
-    FieldTrace trace(get_t0(),get_dt(),get_Nt());
-    
+    FieldTrace center = A[ix][iy];
+    // the neighbouring traces are resampled to the timing defined by the center trace
+    FieldTrace right = center;
+    FieldTrace left = center;
+    // the return trace
+    FieldTrace trace = center;
     if (iy==0)
-        trace = (A[ix][1] - A[ix][0]) / dY;
+    {
+        A[ix][1].retard(0.0, &right);
+        trace = (right-center) / dY;
+    }
     else 
     {
         if (iy==Ny-1)
-            trace = (A[ix][Ny-1] - A[ix][Ny-2]) / dY;
+        {
+            A[ix][Ny-2].retard(0.0, &left);
+            trace = (center-left) / dY;
+        }
         else
-            trace = (A[ix][iy+1] - A[ix][iy-1]) / (dY*2.0);
+        {
+            A[ix][iy+1].retard(0.0, &right);
+            A[ix][iy-1].retard(0.0, &left);
+            trace = (right-left) / (dY*2.0);
+        };
     }
     return trace;
 }
 
 void Screen::computeDerivatives()
 {
+    int Nt = A[0][0].get_N();
+    FieldTrace trace(0.0,0.0,Nt);
+    // All computations are done in the screen-local reference frame.
+    // Is is assumed that (xVec, yVec, Normal) form a right-handed orthogonal reference frame.
+    // Components Ex, Bx are those in the xVec direction (unit vector ex)
+    // and all other components accordingly
+    Vector ex = xVec;
+    ex.normalize();
+    Vector ey = yVec;
+    ey.normalize();
+    Vector ez = Normal;
+    // declare some pointers needed to copy field components
+    double *pEx, *pEy, *pEz, *pBx, *pBy, *pBz;
     // compute the time-derivatives for all traces
-    // pragma omp parallel for
+    // this derivative is stored in the global reference frame
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
             dt_A[ix][iy] = A[ix][iy].derivative();
-    // compute the normal derivatives using the Maxwell equations
-    // this is the drivative along the Normal direction (in the screen-local frame)
-    // is is assumed that (xVec, yVec, Normal) form a right-handed orthogonal reference frame
-    int Nt = A[0][0].get_N();
-    FieldTrace trace(0.0,0.0,Nt);
-    double *pEx, *pEy, *pEz, *pBx, *pBy, *pBz;
-    double *dx_Ex = new double[Nx*Ny*Nt];
-    pEx = dx_Ex;
-    double *dx_Ez = new double[Nx*Ny*Nt];
-    pEz = dx_Ez;
-    double *dx_Bx = new double[Nx*Ny*Nt];
-    pBx = dx_Bx;
-    double *dx_Bz = new double[Nx*Ny*Nt];
-    pBz = dx_Bz;
-    // this is not parallelizable because the pointers are used by all threads
-    // pragma omp parallel for private(trace)
-    for (int ix=0; ix<Nx; ix++)
-        for (int iy=0; iy<Ny; iy++)
-        {
-            trace = dx_A(ix,iy);
-            for (int it=0; it<Nt; it++)
-            {
-                ElMagField f = trace.get_field(it);
-                *pEx++ = f.E().x;
-                *pEz++ = f.E().z;
-                *pBx++ = f.B().x;
-                *pBz++ = f.B().z;
-            }
-        };
-    double *dy_Ey = new double[Nx*Ny*Nt];
-    pEy = dy_Ey;
-    double *dy_Ez = new double[Nx*Ny*Nt];
-    pEz = dy_Ez;
-    double *dy_By = new double[Nx*Ny*Nt];
-    pBy = dy_By;
-    double *dy_Bz = new double[Nx*Ny*Nt];
-    pBz = dy_Bz;
-    // this is not parallelizable because the pointers are used by all threads
-    // pragma omp parallel for private(trace)
-    for (int ix=0; ix<Nx; ix++)
-        for (int iy=0; iy<Ny; iy++)
-        {
-            trace = dy_A(ix,iy);
-            for (int it=0; it<Nt; it++)
-            {
-                ElMagField f = trace.get_field(it);
-                *pEy++ = f.E().y;
-                *pEz++ = f.E().z;
-                *pBy++ = f.B().y;
-                *pBz++ = f.B().z;
-            }
-        };
+    // compute the screen-local components of the time derivatives
     double *dt_Ex = new double[Nx*Ny*Nt];
-    pEx = dt_Ex;
     double *dt_Ey = new double[Nx*Ny*Nt];
-    pEy = dt_Ey;
     double *dt_Bx = new double[Nx*Ny*Nt];
-    pBx = dt_Bx;
     double *dt_By = new double[Nx*Ny*Nt];
+    pEx = dt_Ex;
+    pEy = dt_Ey;
+    pBx = dt_Bx;
     pBy = dt_By;
-    // this is not parallelizable because the pointers are used by all threads
-    // pragma omp parallel for private(trace)
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {
+            // here the components of the field are in global coordinates
             trace = dt_A[ix][iy];
+            // translate to screen-local components
             for (int it=0; it<Nt; it++)
             {
                 ElMagField f = trace.get_field(it);
-                *pEx++ = f.E().x;
-                *pEy++ = f.E().y;
-                *pBx++ = f.B().x;
-                *pBy++ = f.B().y;
+                *pEx++ = dot(f.E(),ex);
+                *pEy++ = dot(f.E(),ey);
+                *pBx++ = dot(f.B(),ex);
+                *pBy++ = dot(f.B(),ey);
             }
         };
+    // Compute the derivatives along the xVec axis
+    double *dx_Ex = new double[Nx*Ny*Nt];
+    double *dx_Ez = new double[Nx*Ny*Nt];
+    double *dx_Bx = new double[Nx*Ny*Nt];
+    double *dx_Bz = new double[Nx*Ny*Nt];
+    pEx = dx_Ex;
+    pEz = dx_Ez;
+    pBx = dx_Bx;
+    pBz = dx_Bz;
+    for (int ix=0; ix<Nx; ix++)
+        for (int iy=0; iy<Ny; iy++)
+        {
+            // here the components of the field are in global coordinates
+            trace = dx_A(ix,iy);
+            // translate to screen-local components
+            for (int it=0; it<Nt; it++)
+            {
+                ElMagField f = trace.get_field(it);
+                *pEx++ = dot(f.E(),ex);
+                *pEz++ = dot(f.E(),ez);
+                *pBx++ = dot(f.B(),ex);
+                *pBz++ = dot(f.B(),ez);
+            }
+        };
+    // Compute the derivatives along the yVec axis
+    double *dy_Ey = new double[Nx*Ny*Nt];
+    double *dy_Ez = new double[Nx*Ny*Nt];
+    double *dy_By = new double[Nx*Ny*Nt];
+    double *dy_Bz = new double[Nx*Ny*Nt];
+    pEy = dy_Ey;
+    pEz = dy_Ez;
+    pBy = dy_By;
+    pBz = dy_Bz;
+    for (int ix=0; ix<Nx; ix++)
+        for (int iy=0; iy<Ny; iy++)
+        {
+            // here the components of the field are in global coordinates
+            trace = dy_A(ix,iy);
+            // translate to screen-local components
+            for (int it=0; it<Nt; it++)
+            {
+                ElMagField f = trace.get_field(it);
+                *pEy++ = dot(f.E(),ey);
+                *pEz++ = dot(f.E(),ez);
+                *pBy++ = dot(f.B(),ey);
+                *pBz++ = dot(f.B(),ez);
+            }
+        };
+    // Compute the ez derivatives using the Maxwell equations in screen-local coordinates.
+    // This is the drivative along the Normal direction (in the screen-local frame).
     double *dz_Ex = new double[Nx*Ny*Nt];
     double *dz_Ey = new double[Nx*Ny*Nt];
     double *dz_Ez = new double[Nx*Ny*Nt];
@@ -340,8 +415,6 @@ void Screen::computeDerivatives()
     double *dz_By = new double[Nx*Ny*Nt];
     double *dz_Bz = new double[Nx*Ny*Nt];
     double cSquared = SpeedOfLight*SpeedOfLight;
-    // this is not parallelizable because the pointers are used by all threads
-    // pragma omp parallel for private(trace)
     for (int i=0; i<Nx*Ny*Nt; i++)
     {
         dz_Ex[i] = dx_Ez[i] - dt_By[i];
@@ -351,25 +424,27 @@ void Screen::computeDerivatives()
         dz_By[i] = dy_Bz[i] - dt_Ex[i]/cSquared;
         dz_Bz[i] = -dx_Bx[i] - dy_By[i];
     };
+    // Transform the normal derivatives back to global coordinates
     pEx = dz_Ex;
     pEy = dz_Ey;
     pEz = dz_Ez;
     pBx = dz_Bx;
     pBy = dz_By;
     pBz = dz_Bz;
-    // this is not parallelizable because the pointers are used by all threads
-    // pragma omp parallel for
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
         {
+            // this is necessary to set the correct timing
+            trace = A[ix][iy];
+            // now set the field data
             for (int it=0; it<Nt; it++)
             {
-                Vector E = Vector(*pEx++,*pEy++,*pEz++);
-                Vector B = Vector(*pBx++,*pBy++,*pBz++);
+                Vector E = ex * (*pEx++) + ey * (*pEy++) + ez * (*pEz++);
+                Vector B = ex * (*pBx++) + ey * (*pBy++) + ez * (*pBz++);
                 ElMagField f = ElMagField(E,B);
                 trace.set(it,f);
             }
-            dn_A[ix][iy] = trace*(-1.0);
+            dn_A[ix][iy] = trace;
         };
     delete dx_Ex;
     delete dx_Ez;
@@ -391,34 +466,67 @@ void Screen::computeDerivatives()
     delete dz_Bz;
 }
 
-FieldTrace Screen::propagation(Vector target, double t0_p, int N_p)
+void Screen::propagate_to(Vector target_pos, FieldTrace *target_trace)
 {
-    double dt = A[0][0].get_dt();
-    FieldTrace trace(t0_p, dt, N_p);
+    // this is the result sum
+    FieldTrace trace(target_trace);
+    trace.zero();
+    // this is the source trace
+    FieldTrace t1(A[0][0]);
+    // this is the component to be added to the result trace
+    FieldTrace t2(target_trace);
     for (int ix=0; ix<Nx; ix++)
         for (int iy=0; iy<Ny; iy++)
-        {
+        {   
             Vector source = get_point(ix,iy);
-            Vector RVec = target-source;
+            Vector RVec = target_pos - source;
             double R = RVec.norm();
             double R2 = R*R;
             double R3 = R2*R;
-            FieldTrace t1 = A[ix][iy];
-            FieldTrace t2 = t1.retarded(R/SpeedOfLight, t0_p, N_p);
-            trace += t2 * (dot(RVec,Normal)/R3);
-            t1 = dt_A[ix][iy];
-            t2 = t1.retarded(R/SpeedOfLight, t0_p, N_p);
-            trace += t2 * (dot(RVec,Normal)/(R2*SpeedOfLight));
-            t1 = dn_A[ix][iy];
-            t2 = t1.retarded(R/SpeedOfLight, t0_p, N_p);
-            trace += t2 * (-1.0/R);
+            try
+            {
+                t1 = A[ix][iy];
+                t1.retard(R/SpeedOfLight, &t2);
+                trace += t2 * (-dot(RVec,Normal)/R3);
+            }
+            catch(FieldTrace_Zero exc)
+            {
+                std::cout << "FieldTrace first term zero exception at ix=" << ix << "  iy=" << iy << std::endl;
+                throw(Screen_Zero_exception(ix,iy));
+            }
+            try
+            {
+                t1 = dt_A[ix][iy];
+                t1.retard(R/SpeedOfLight, &t2);
+                trace += t2 * (-dot(RVec,Normal)/(R2*SpeedOfLight));
+            }
+            catch(FieldTrace_Zero exc)
+            {
+                std::cout << "FieldTrace second term zero exception at ix=" << ix << "  iy=" << iy << std::endl;
+                throw(Screen_Zero_exception(ix,iy));
+            }
+            try
+            {
+                t1 = dn_A[ix][iy];
+                t1.retard(R/SpeedOfLight, &t2);
+                // TODO: why is this term positive - should be negative
+                trace += t2 * (1.0/R);
+            }
+            catch(FieldTrace_Zero exc)
+            {
+                std::cout << "FieldTrace third term zero exception at ix=" << ix << "  iy=" << iy << std::endl;
+                throw(Screen_Zero_exception(ix,iy));
+            }
         }    
-    return(trace * dA/(4.0*Pi));
+    *target_trace = trace * dA/(4.0*Pi);
 }
 
 void Screen::writeFieldHDF5(std::string filename)
 {
     herr_t status;
+    hid_t atts, att;
+    hid_t dataspace, dcpl, dataset;
+    
     cout << "writing HDF5 file " << filename << endl;
     // Create a new file using the default properties.
     hid_t file = H5Fcreate (filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
@@ -430,8 +538,8 @@ void Screen::writeFieldHDF5(std::string filename)
     pdims[0] = Nx;
     pdims[1] = Ny;
     pdims[2] = 3;
-    hid_t pspace = H5Screate_simple (3, pdims, NULL);
-    if (pspace<0) throw(Screen_FileWriteError());
+    dataspace = H5Screate_simple (3, pdims, NULL);
+    if (dataspace<0) throw(Screen_FileWriteError());
     // buffer the data
     double *buffer = new double[Nx*Ny*3];
     double *bp = buffer;
@@ -444,48 +552,97 @@ void Screen::writeFieldHDF5(std::string filename)
 	        *bp++ = pos.z;
 	    };
     // Create the dataset creation property list
-    hid_t pdcpl = H5Pcreate (H5P_DATASET_CREATE);
-    if (pdcpl<0) throw(Screen_FileWriteError());
+    dcpl = H5Pcreate (H5P_DATASET_CREATE);
+    if (dcpl<0) throw(Screen_FileWriteError());
     // Create the dataset.
-    hid_t pdset = H5Dcreate(file,
+    dataset = H5Dcreate(file,
         "ObservationPosition",		// dataset name
         H5T_NATIVE_DOUBLE,		// data type
-        pspace, H5P_DEFAULT,
-        pdcpl, H5P_DEFAULT);
-    if (pdset<0) throw(Screen_FileWriteError());
+        dataspace, H5P_DEFAULT,
+        dcpl, H5P_DEFAULT);
+    if (dataset<0) throw(Screen_FileWriteError());
     // Write the data to the dataset
-    status = H5Dwrite (pdset,
+    status = H5Dwrite (dataset,
         H5T_NATIVE_DOUBLE, 		// mem type id
         H5S_ALL, 			// mem space id
-        pspace,
+        dataspace,
         H5P_DEFAULT,			// data transfer properties
         buffer);
     if (status<0) throw(Screen_FileWriteError());
     // attach scalar attributes
-    hid_t atts1  = H5Screate(H5S_SCALAR);
-    if (atts1<0) throw(Screen_FileWriteError());
-    hid_t attr1 = H5Acreate2(pdset, "Nx", H5T_NATIVE_INT, atts1, H5P_DEFAULT, H5P_DEFAULT);
-    if (attr1<0) throw(Screen_FileWriteError());
-    status = H5Awrite(attr1, H5T_NATIVE_INT, &Nx);
+    atts  = H5Screate(H5S_SCALAR);
+    if (atts<0) throw(Screen_FileWriteError());
+    att = H5Acreate2(dataset, "Nx", H5T_NATIVE_INT, atts, H5P_DEFAULT, H5P_DEFAULT);
+    if (att<0) throw(Screen_FileWriteError());
+    status = H5Awrite(att, H5T_NATIVE_INT, &Nx);
     if (status<0) throw(Screen_FileWriteError());
-    status = H5Sclose (atts1);
+    att = H5Acreate2(dataset, "Ny", H5T_NATIVE_INT, atts, H5P_DEFAULT, H5P_DEFAULT);
+    if (att<0) throw(Screen_FileWriteError());
+    status = H5Awrite(att, H5T_NATIVE_INT, &Ny);
     if (status<0) throw(Screen_FileWriteError());
-    hid_t atts2  = H5Screate(H5S_SCALAR);
-    if (atts2<0) throw(Screen_FileWriteError());
-    hid_t attr2 = H5Acreate2(pdset, "Ny", H5T_NATIVE_INT, atts2, H5P_DEFAULT, H5P_DEFAULT);
-    if (attr2<0) throw(Screen_FileWriteError());
-    status = H5Awrite(attr2, H5T_NATIVE_INT, &Ny);
-    if (status<0) throw(Screen_FileWriteError());
-    status = H5Sclose (atts2);
+    status = H5Sclose (atts);
     if (status<0) throw(Screen_FileWriteError());
     // Close and release resources.
-    status = H5Pclose (pdcpl);
+    status = H5Pclose (dcpl);
     if (status<0) throw(Screen_FileWriteError());
-    status = H5Dclose (pdset);
+    status = H5Dclose (dataset);
     if (status<0) throw(Screen_FileWriteError());
-    status = H5Sclose (pspace);
+    status = H5Sclose (dataspace);
     if (status<0) throw(Screen_FileWriteError());
-    delete[] buffer;
+    delete buffer;
+
+    // Create dataspace for the field trace timing.
+    hsize_t t0dims[2];
+    t0dims[0] = Nx;
+    t0dims[1] = Ny;
+    dataspace = H5Screate_simple (2, t0dims, NULL);
+    if (dataspace<0) throw(Screen_FileWriteError());
+    // buffer the data
+    buffer = new double[Nx*Ny];
+    for (int ix=0; ix<Nx; ix++)
+	    for (int iy=0; iy<Ny; iy++)
+	        buffer[ix*Ny+iy] = A[ix][iy].get_t0();
+    // Create the dataset creation property list
+    dcpl = H5Pcreate (H5P_DATASET_CREATE);
+    if (dcpl<0) throw(Screen_FileWriteError());
+    // Create the dataset.
+    dataset = H5Dcreate(file,
+        "ObservationTime",		// dataset name
+        H5T_NATIVE_DOUBLE,		// data type
+        dataspace, H5P_DEFAULT,
+        dcpl, H5P_DEFAULT);
+    if (dataset<0) throw(Screen_FileWriteError());
+    // Write the data to the dataset
+    status = H5Dwrite (dataset,
+        H5T_NATIVE_DOUBLE, 		// mem type id
+        H5S_ALL, 			// mem space id
+        dataspace,
+        H5P_DEFAULT,			// data transfer properties
+        buffer);
+    if (status<0) throw(Screen_FileWriteError());
+    // attach scalar attributes
+    atts  = H5Screate(H5S_SCALAR);
+    if (atts<0) throw(Screen_FileWriteError());
+    att = H5Acreate2(dataset, "Nt", H5T_NATIVE_INT, atts, H5P_DEFAULT, H5P_DEFAULT);
+    if (att<0) throw(Screen_FileWriteError());
+    int Nt = get_Nt();
+    status = H5Awrite(att, H5T_NATIVE_INT, &Nt);
+    if (status<0) throw(Screen_FileWriteError());
+    att = H5Acreate2(dataset, "dt", H5T_NATIVE_DOUBLE, atts, H5P_DEFAULT, H5P_DEFAULT);
+    if (att<0) throw(Screen_FileWriteError());
+    double dt = get_dt();
+    status = H5Awrite(att, H5T_NATIVE_DOUBLE, &dt);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Sclose (atts);
+    if (status<0) throw(Screen_FileWriteError());
+    // Close and release resources.
+    status = H5Pclose (dcpl);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Dclose (dataset);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Sclose (dataspace);
+    if (status<0) throw(Screen_FileWriteError());
+    delete buffer;
 
     // Create dataspace for the field data.
     // Setting maximum size to NULL sets the maximum size to be the current size.
@@ -494,66 +651,38 @@ void Screen::writeFieldHDF5(std::string filename)
     dims[1] = Ny;
     dims[2] = A[0][0].get_N();
     dims[3] = 6;
-    hid_t space = H5Screate_simple (4, dims, NULL);
-    if (space<0) throw(Screen_FileWriteError());
+    dataspace = H5Screate_simple (4, dims, NULL);
+    if (dataspace<0) throw(Screen_FileWriteError());
     // buffer the data
     buffer = new double[getBufferSize()];
     if (buffer==0) throw(Screen_MemoryAllocationError());
     bufferArray(buffer);
     // Create the dataset creation property list
-    hid_t dcpl = H5Pcreate (H5P_DATASET_CREATE);
+    dcpl = H5Pcreate (H5P_DATASET_CREATE);
     if (dcpl<0) throw(Screen_FileWriteError());
     // Create the dataset.
-    hid_t dset = H5Dcreate (file,
+    dataset = H5Dcreate (file,
         "ElMagField", 			// dataset name
         H5T_NATIVE_DOUBLE,		// data type
-        space, H5P_DEFAULT,
+        dataspace, H5P_DEFAULT,
         dcpl, H5P_DEFAULT);
-    if (dset<0) throw(Screen_FileWriteError());
+    if (dataset<0) throw(Screen_FileWriteError());
     // Write the data to the dataset
-    status = H5Dwrite (dset,
+    status = H5Dwrite (dataset,
         H5T_NATIVE_DOUBLE, 		// mem type id
         H5S_ALL, 			    // mem space id
-        space,
+        dataspace,
         H5P_DEFAULT,			// data transfer properties
         buffer);
-    if (status<0) throw(Screen_FileWriteError());
-    // attach scalar attributes
-    hid_t atts  = H5Screate(H5S_SCALAR);
-    if (atts<0) throw(Screen_FileWriteError());
-    hid_t attr = H5Acreate2(dset, "t0", H5T_NATIVE_DOUBLE, atts, H5P_DEFAULT, H5P_DEFAULT);
-    if (attr<0) throw(Screen_FileWriteError());
-    double t0 = A[0][0].get_t0();
-    status = H5Awrite(attr, H5T_NATIVE_DOUBLE, &t0);
-    if (status<0) throw(Screen_FileWriteError());
-    status = H5Sclose (atts);
-    if (status<0) throw(Screen_FileWriteError());
-    atts  = H5Screate(H5S_SCALAR);
-    if (atts<0) throw(Screen_FileWriteError());
-    attr = H5Acreate2(dset, "dt", H5T_NATIVE_DOUBLE, atts, H5P_DEFAULT, H5P_DEFAULT);
-    if (attr<0) throw(Screen_FileWriteError());
-    double dt = A[0][0].get_dt();
-    status = H5Awrite(attr, H5T_NATIVE_DOUBLE, &dt);
-    if (status<0) throw(Screen_FileWriteError());
-    status = H5Sclose (atts);
-    if (status<0) throw(Screen_FileWriteError());
-    atts  = H5Screate(H5S_SCALAR);
-    if (atts<0) throw(Screen_FileWriteError());
-    attr = H5Acreate2(dset, "NOTS", H5T_NATIVE_INT, atts, H5P_DEFAULT, H5P_DEFAULT);
-    if (attr<0) throw(Screen_FileWriteError());
-    int Nt = A[0][0].get_N();
-    status = H5Awrite(attr, H5T_NATIVE_INT, &Nt);
-    if (status<0) throw(Screen_FileWriteError());
-    status = H5Sclose (atts);
     if (status<0) throw(Screen_FileWriteError());
     // Close and release resources.
     status = H5Pclose (dcpl);
     if (status<0) throw(Screen_FileWriteError());
-    status = H5Dclose (dset);
+    status = H5Dclose (dataset);
     if (status<0) throw(Screen_FileWriteError());
-    status = H5Sclose (space);
+    status = H5Sclose (dataspace);
     if (status<0) throw(Screen_FileWriteError());
-    delete[] buffer;
+    delete buffer;
 
     status = H5Fclose (file);
     if (status<0) throw(Screen_FileWriteError());

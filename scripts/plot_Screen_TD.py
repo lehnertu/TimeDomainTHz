@@ -2,13 +2,19 @@
 # coding=UTF-8
 
 import sys, time
-import os.path
+import os
+import psutil
 import argparse
 import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter
 from matplotlib.patches import Circle
+
+pid = os.getpid()
+print("PID = ",pid)
+libmem = psutil.Process(pid).memory_info().rss/2.0**20
+print('libraries memory use: %.2f MB' % libmem)
 
 # magnetic field constant in N/A²
 mu0 = 4*np.pi*1e-7
@@ -30,50 +36,78 @@ if not radOK:
 print("reading %s" % radfile)
 hdf = h5py.File(radfile, "r")
 print(hdf)
-print()
-
 # Get the groups
 pos = hdf['ObservationPosition']
 Nx = pos.attrs.get('Nx')
 Ny = pos.attrs.get('Ny')
-print("Nx=%d Ny=%d" % (Nx,Ny))
-print(pos)
-field = hdf['ElMagField']
-print(field)
-t0 = field.attrs.get('t0')
-dt = field.attrs.get('dt')
-nots = field.attrs.get('NOTS')
-print("t0=%g dt=%g NOTS=%d" % (t0, dt, nots))
-pos = np.array(pos)
-a = np.array(field)
-hdf.close()
-print()
-
 xcenter = (Nx-1)//2
 ycenter = (Ny-1)//2
+print("Nx=%d Ny=%d" % (Nx,Ny))
+print(pos)
+time = hdf['ObservationTime']
+nots = time.attrs.get('Nt')
+dt = time.attrs.get('dt')
+print("Nt=%d dt=%g" % (nots,dt))
+print(time)
+field = hdf['ElMagField']
+print(field)
+pos = np.array(pos)
+t0 = np.array(time)
+# a = np.array(field)
+# direct slicing to reduce the memory requirements
+# this should never store the complete array
+onaxis = np.array(field[xcenter,ycenter,:,:])
+if args.xy != None:
+    xi = args.xy[0]
+    yi = args.xy[1]
+    offaxis = np.array(field[xi,yi,:,:])
+hdf.close()
+print("file closed.")
+
+print('data memory use: %.2f MB' % (psutil.Process(pid).memory_info().rss/2.0**20-libmem))
+print()
+
 print("center = (%d, %d)" % (xcenter,ycenter))
 centerposition = pos[xcenter][ycenter]
 print("center position = %s" % centerposition)
+print("start time = %.4f ns" %(1e9*t0[xcenter][ycenter]))
 
-onaxis = a[xcenter][ycenter]
-data = onaxis.transpose()
-
-Ex = data[0]
-Ey = data[1]
-Ez = data[2]
-Bx = data[3]
-By = data[4]
-Bz = data[5]
+Ex = onaxis[:,0]
+Ey = onaxis[:,1]
+Ez = onaxis[:,2]
+Bx = onaxis[:,3]
+By = onaxis[:,4]
+Bz = onaxis[:,5]
 
 EVec = np.array([Ex, Ey, Ez]).transpose()
 BVec = np.array([Bx, By, Bz]).transpose()
 # Poynting vector in V/m * (N/(A m)) / (N/A²) = W/m²
 SVec = np.cross(EVec, BVec) / mu0
-# t = 1e9*np.arange(t0,t0+(nots-1)*dt,dt)
-t = 1e9*np.linspace(t0,t0+(nots-1)*dt,nots)
+t = 1e9*np.linspace(t0[xcenter][ycenter],t0[xcenter][ycenter]+(nots-1)*dt,nots)
 print("on axis energy flow density = %s µJ/m²" % (1e6*SVec.sum(axis=0)*dt))
 
-# first figure with the time-trace of the fields on axis
+if args.xy != None:
+
+    print("index = (%d, %d)" % (xi,yi))
+    position = pos[xi][yi]
+    print("off-axis position = %s" % position)
+    print("start time = %.4f ns" %(1e9*t0[xi][yi]))
+
+    Ex = offaxis[:,0]
+    Ey = offaxis[:,1]
+    Ez = offaxis[:,2]
+    Bx = offaxis[:,3]
+    By = offaxis[:,4]
+    Bz = offaxis[:,5]
+
+    EVec = np.array([Ex, Ey, Ez]).transpose()
+    BVec = np.array([Bx, By, Bz]).transpose()
+    # Poynting vector in V/m * (N/(A m)) / (N/A²) = W/m²
+    SVec = np.cross(EVec, BVec) / mu0
+    t = 1e9*np.linspace(t0[xi][yi],t0[xi][yi]+(nots-1)*dt,nots)
+    print("off axis energy flow density = %s µJ/m²" % (1e6*SVec.sum(axis=0)*dt))
+
+# prepage the plot
 
 left, width = 0.15, 0.80
 rect1 = [left, 0.55, width, 0.40]  #left, bottom, width, height
@@ -82,6 +116,8 @@ fig = plt.figure(1,figsize=(12,9))
 
 ax1 = fig.add_axes(rect1)
 ax4 = fig.add_axes(rect2, sharex=ax1)
+
+# plot the time-trace of the fields
 
 l1 = ax1.plot(t, Ex, "r-", label=r'$E_x$')
 l2 = ax1.plot(t, Ey, "b-", label=r'$E_y$')
@@ -105,61 +141,5 @@ lines = l4 + l5 +l6
 labels = [l.get_label() for l in lines]
 ax4.legend(lines,labels,loc='upper right')
 ax4.grid(True)
-
-if args.xy != None:
-
-    xi = args.xy[0]
-    yi = args.xy[1]
-    print("index = (%d, %d)" % (xi,yi))
-    position = pos[xi][yi]
-    print("off-axis position = %s" % position)
-
-    offaxis = a[xi][yi]
-    data = offaxis.transpose()
-    
-    Ex = data[0]
-    Ey = data[1]
-    Ez = data[2]
-    Bx = data[3]
-    By = data[4]
-    Bz = data[5]
-
-    EVec = np.array([Ex, Ey, Ez]).transpose()
-    BVec = np.array([Bx, By, Bz]).transpose()
-    # Poynting vector in V/m * (N/(A m)) / (N/A²) = W/m²
-    SVec = np.cross(EVec, BVec) / mu0
-    # t = 1e9*np.arange(t0,t0+(nots-1)*dt,dt)
-    t = 1e9*np.linspace(t0,t0+(nots-1)*dt,nots)
-    print("off axis energy flow density = %s µJ/m²" % (1e6*SVec.sum(axis=0)*dt))
-
-    # second figure with the time-trace of the fields off axis
-
-    fig2 = plt.figure(2,figsize=(12,9))
-    
-    ax21 = fig2.add_axes(rect1)
-    ax24 = fig2.add_axes(rect2, sharex=ax1)
-    
-    l21 = ax21.plot(t, Ex, "r-", label=r'$E_x$')
-    l22 = ax21.plot(t, Ey, "b-", label=r'$E_y$')
-    l23 = ax21.plot(t, Ez, "g-", label=r'$E_z$')
-    
-    ax21.set_ylabel(r'$E$ [V/m]')
-    lines = l21 + l22 + l23
-    labels = [l.get_label() for l in lines]
-    ax21.legend(lines,labels,loc='upper right')
-    for label in ax21.get_xticklabels():
-        label.set_visible(False)
-    ax21.grid(True)
-
-    l24 = ax24.plot(t, Bx, "r-", label=r'$B_x$')
-    l25 = ax24.plot(t, By, "b-", label=r'$B_y$')
-    l26 = ax24.plot(t, Bz, "g-", label=r'$B_z$')
-    
-    ax24.set_ylabel(r'$B$ [T]')
-    ax24.set_xlabel(r't [ns]')
-    lines = l24 + l25 +l26
-    labels = [l.get_label() for l in lines]
-    ax24.legend(lines,labels,loc='upper right')
-    ax24.grid(True)
 
 plt.show()

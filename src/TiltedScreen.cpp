@@ -68,6 +68,10 @@ int main(int argc, char* argv[])
     // with modified sources we write the derivatives insted
     // Screen::bufferArray() is changed to deliver dx_A instead of A
     // source->writeFieldHDF5("Gaussian_51_dx.h5");
+    Vector origin = source->get_Center();
+    FieldTrace source_trace = source->get_trace(source->get_Nx()/2,source->get_Ny()/2);
+    double source_t0 = source_trace.get_t0();
+    int source_Nt = source_trace.get_N();
 
     // The target screen is angled 45 degrees to the beam incidence (z axis).
     // It reflects the beam from z propagation direction to x.
@@ -77,24 +81,27 @@ int main(int argc, char* argv[])
     // lambda=1mm => 0.05mm  in this case
     
     // The target screen total size is 100x100mm in the projection giving 140mm in the tilted plane.
-    // The length of the time trace has to be increased to accomodate the
-    // 50mm = 170ps = 1700*dt  difference of arrival times center to edge
+    // The start time of the target trace is adjusted such that the signal from
+    // the screen center at mid-time arrives at the target trace at mid-time
     
     // define the target screen
     double distance = 1.25751;
-    int Nx = 81;
-    int Ny = 15;
-    FieldTrace source_trace = source->get_Trace(0,0);
-    int Nt = source_trace.get_N()+4000;
+    int Nx = 2001;
+    int Ny = 51;
+    int Nt = 500;
+    double dt = source_trace.get_dt();
     Screen *target = new Screen(
         Nx, Ny, Nt,
-        Vector(0.0005,0.0,0.0005),
-        Vector(0.0,-0.005,0.0),
+        Vector(0.00005,0.0,0.00005),
+        Vector(0.0,-0.0025,0.0),
         source->get_Center() + Vector(0.0,0.0,distance) );
     target->writeReport(&cout);
 
+    // the propagation direction is given by the screen centers
+    Vector prop_dir = target->get_Center() - source->get_Center();
+    prop_dir.normalize();
+    
     // compute the source beam propagated to the target screen
-    double target_t0 = source->get_tCenter()+distance/SpeedOfLight-source->get_dt()*(double)Nt/2.0;
     time_t start_t;
     time(&start_t);
     time_t print_time = start_t;
@@ -111,20 +118,23 @@ int main(int argc, char* argv[])
         {
             std::cout << "computing propagated source fields on " << omp_get_num_threads() << " parallel threads" << std::endl;
         }
+        // every thread has its own trace to compute
+        FieldTrace target_trace(0.0,dt,Nt);
         #pragma omp for
         for (int i=0; i<Nx*Ny; i++)
         {
             // we comprise the two loops over ix and iy into one parallel loop
             int ix = i/Ny;
             int iy = i - ix*Ny;
-            /* pragma omp critical
-            {
-                std::cout << "ix = " << ix << "  iy = " << iy << std::endl;
-            };
-            */
             Vector pos = target->get_point(ix,iy);
-            FieldTrace target_trace = source->propagation(pos, target_t0, Nt);
-            target->set_Trace(ix, iy, target_trace);
+            // the target trace timing is set by the distance from the source plane
+            double delta = dot((pos-origin),prop_dir)/SpeedOfLight;
+            // if the traces have different length delta has to be adjusted
+            // to align the center and not the beginning of the traces
+            delta += (source_Nt - Nt)/2.0*dt;
+            target_trace.set_t0(source_t0+delta);
+            source->propagate_to(pos, &target_trace);
+            target->set_trace(ix, iy, target_trace);
             // all threads increment the counter
             #pragma omp atomic
             counter++;
@@ -148,7 +158,7 @@ int main(int argc, char* argv[])
     target->writeReport(&cout);
 
     // write the target screen data to file
-    target->writeFieldHDF5("Mirror_81P.h5");
+    target->writeFieldHDF5("Tilted_2001x51.h5");
     
     delete source;
     delete target;

@@ -74,6 +74,7 @@ int main(int argc, char* argv[])
         on_axis->set(i, peak*osc);
     };
     Vector dPdA = on_axis->Poynting();
+    std::cout << "dt  = " << on_axis->get_dt()*1.0e9 << " ns" << std::endl;
     std::cout << "Power density on axis = ";
     std::cout << "(" << dPdA.x << ", " << dPdA.y << ", " << dPdA.z << ")";
     std::cout << " J/m²" << std::endl << std::endl;
@@ -93,7 +94,7 @@ int main(int argc, char* argv[])
             Vector pos = scr->get_point(ix,iy);
             double r = (pos-center).norm();
             double radint = exp(-r*r/(w0*w0));
-            scr->set_Trace(ix,iy, (*on_axis)*radint);
+            scr->set_trace(ix,iy, (*on_axis)*radint);
         };
         
     // print report

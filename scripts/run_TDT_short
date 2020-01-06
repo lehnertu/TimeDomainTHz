@@ -1,0 +1,13 @@
+#!/bin/bash
+
+source $HOME/.bashrc
+basedir=$HOME/TimeDomainTHz
+rundir=/bigdata/fwke/lehnertu/TimeDomainTHz
+# rundir=$basedir/build
+
+module load gcc
+module load hdf5
+
+cd $rundir
+$basedir/build/PropagateStraight Gaussian_51.h5 Gaussian_51_Straight125cm_51.h5
+
