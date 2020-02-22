@@ -75,7 +75,25 @@ def MeshNormals(points, triangles):
         normals.append(n / np.linalg.norm(n))
     return np.array(normals)
 
-def ShowMesh(points, triangles, centers=[], scalars=[], scalarTitle="", showAxes=False):
+def powerLUT():
+    lut = vtk.vtkLookupTable()
+    nc = 256
+    ctf = vtk.vtkColorTransferFunction()
+    # black-red-yellow-white
+    # ctf.SetColorSpaceToDiverging()
+    ctf.AddRGBPoint(0.0, 0.0, 0.0, 0.0)
+    ctf.AddRGBPoint(0.5, 0.7, 0.0, 0.0)
+    ctf.AddRGBPoint(0.8, 0.7, 0.7, 0.0)
+    ctf.AddRGBPoint(1.0, 1.0, 1.0, 1.0)
+    lut.SetNumberOfTableValues(nc)
+    lut.Build()
+    for i in range(0, nc):
+        rgb = list(ctf.GetColor(float(i) / nc))
+        rgb.append(1.0)
+        lut.SetTableValue(i, *rgb)
+    return lut
+
+def ShowMeshedField(points, triangles, centers=[], scalars=[], scalarTitle="", showAxes=False):
     """
     Render a display of a mesh geometry using VTK.
     If given the center points of the triangles are rendered.
@@ -102,10 +120,8 @@ def ShowMesh(points, triangles, centers=[], scalars=[], scalarTitle="", showAxes
             scal.SetNumberOfValues(Ncells)
             for i,val in enumerate(scalars):
                 scal.SetValue(i,val)
-            lut = vtk.vtkLookupTable()
-            lut.SetNumberOfColors(2048)
-            lut.Build()
             meshData.GetCellData().SetScalars(scal)
+            lut = powerLUT()
             meshMapper.SetLookupTable(lut)
             meshMapper.SetScalarRange(0.0,np.max(scalars))
             # create a color scale bar
@@ -185,7 +201,7 @@ def WriteMesh(filename, points, triangles, pos):
     h5p.attrs['Np'] = len(pos)
     hf.close()
 
-def WriteMeshField(filename, points, triangles, pos, t0, dt, A):
+def WriteMeshedField(filename, points, triangles, pos, t0, dt, A):
     """
     Write the fields on a meshed geometry to an HDF5 file.
     """
@@ -218,7 +234,7 @@ def ReadMesh(filename):
     hdf.close()
     return points, triangles, pos
 
-def ReadMeshField(filename):
+def ReadMeshedField(filename):
     """
     Read the meshed geometry from an HDF5 file.
     Return values:
