@@ -39,20 +39,8 @@ add_library(thzlib ${lib_sources})
 # compiler flags
 add_definitions(-std=c++11 -Wall -g0 -m64 -pthread)
 
-add_executable(GaussianWavePacket ${PROJECT_SOURCE_DIR}/src/GaussianWavePacket.cpp)
-target_link_libraries(GaussianWavePacket
-        thzlib
-        ${HDF5_LIBRARIES}
-        ${ZLIB_LIBRARY_RELEASE} )
-
-add_executable(PropagateStraight ${PROJECT_SOURCE_DIR}/src/PropagateStraight.cpp)
-target_link_libraries(PropagateStraight
-        thzlib
-        ${HDF5_LIBRARIES}
-        ${ZLIB_LIBRARY_RELEASE} )
-
-add_executable(TiltedScreen ${PROJECT_SOURCE_DIR}/src/TiltedScreen.cpp)
-target_link_libraries(TiltedScreen
+add_executable(Propagate ${PROJECT_SOURCE_DIR}/src/Propagate.cpp)
+target_link_libraries(Propagate
         thzlib
         ${HDF5_LIBRARIES}
         ${ZLIB_LIBRARY_RELEASE} )

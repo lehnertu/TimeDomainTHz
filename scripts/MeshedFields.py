@@ -187,13 +187,13 @@ def ShowMeshedField(points, triangles, centers=[], scalars=[], scalarTitle="", s
         centerActor = vtk.vtkActor()
         centerActor.SetMapper(centerMapper)
         centerActor.GetProperty().SetPointSize(3)
-        centerActor.GetProperty().SetColor(colors.GetColor3d("LightBlue"))
+        centerActor.GetProperty().SetColor(colors.GetColor3d("Blue"))
     # add some text to annotate the selected cell
     textMapper = vtk.vtkTextMapper()
     textMapper.SetInput("Cell index:\npos:\nval=")
     tprop = textMapper.GetTextProperty()
     tprop.SetJustificationToLeft()
-    tprop.SetColor(colors.GetColor3d("Blue"))
+    tprop.SetColor(colors.GetColor3d("LightBlue"))
     tprop.SetFontSize(20)
     textActor = vtk.vtkActor2D()
     textActor.SetMapper(textMapper)
@@ -257,7 +257,7 @@ def WriteMeshedField(filename, points, triangles, pos, t0, dt, A):
     h5p = hf.create_dataset('ObservationPosition', data=pos, dtype='f8')
     h5p.attrs['Np'] = len(pos)
     h5p = hf.create_dataset('ObservationTime',data=t0, dtype='f8')
-    h5p.attrs['Nt'] = len(t0)
+    h5p.attrs['Nt'] = A.shape[1]
     h5p.attrs['dt'] = dt
     h5p = hf.create_dataset('ElMagField', data=A, dtype='f8')
     hf.close()
