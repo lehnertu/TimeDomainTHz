@@ -75,6 +75,19 @@ def MeshNormals(points, triangles):
         normals.append(n / np.linalg.norm(n))
     return np.array(normals)
 
+def EnergyFlowDensity(A,dt):
+    """
+    Compute the Poynting vector (energy flow density) of the field
+    integrated over all time with time step dt
+    """
+    Energy = []
+    for trace in A:
+        EVec = trace[:,0:3]
+        BVec = trace[:,3:6]
+        SVec = np.cross(EVec, BVec) / constants.mu_0
+        Energy.append((SVec.sum(axis=0))*dt)
+    return np.array(Energy)
+
 def powerLUT():
     lut = vtk.vtkLookupTable()
     nc = 256
