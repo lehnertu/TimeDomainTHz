@@ -93,6 +93,23 @@ def powerLUT():
         lut.SetTableValue(i, *rgb)
     return lut
 
+class MyInteractor(vtk.vtkInteractorStyleTrackballCamera):
+
+    def __init__(self, textMapper, parent=None):
+        self.AddObserver("LeftButtonPressEvent", self.leftButtonPressEvent)
+        selectedMapper = vtk.vtkDataSetMapper()
+        selectedActor = vtk.vtkActor()
+        self.text = textMapper
+
+    def leftButtonPressEvent(self, obj, event):
+        clickPos = self.GetInteractor().GetEventPosition()
+        picker = vtk.vtkCellPicker()
+        picker.Pick(clickPos[0], clickPos[1], 0, self.GetDefaultRenderer())
+        id = picker.GetCellId()
+        self.text.SetInput("Cell index:%d\npos:\nval=" % id)
+        self.OnLeftButtonDown()
+        return
+
 def ShowMeshedField(points, triangles, centers=[], scalars=[], scalarTitle="", showAxes=False):
     """
     Render a display of a mesh geometry using VTK.
@@ -120,8 +137,8 @@ def ShowMeshedField(points, triangles, centers=[], scalars=[], scalarTitle="", s
             scal.SetNumberOfValues(Ncells)
             for i,val in enumerate(scalars):
                 scal.SetValue(i,val)
-            meshData.GetCellData().SetScalars(scal)
             lut = powerLUT()
+            meshData.GetCellData().SetScalars(scal)
             meshMapper.SetLookupTable(lut)
             meshMapper.SetScalarRange(0.0,np.max(scalars))
             # create a color scale bar
@@ -157,7 +174,18 @@ def ShowMeshedField(points, triangles, centers=[], scalars=[], scalarTitle="", s
         centerActor = vtk.vtkActor()
         centerActor.SetMapper(centerMapper)
         centerActor.GetProperty().SetPointSize(3)
-        centerActor.GetProperty().SetColor(colors.GetColor3d("Blue"))
+        centerActor.GetProperty().SetColor(colors.GetColor3d("LightBlue"))
+    # add some text to annotate the selected cell
+    textMapper = vtk.vtkTextMapper()
+    textMapper.SetInput("Cell index:\npos:\nval=")
+    tprop = textMapper.GetTextProperty()
+    tprop.SetJustificationToLeft()
+    tprop.SetColor(colors.GetColor3d("Blue"))
+    tprop.SetFontSize(20)
+    textActor = vtk.vtkActor2D()
+    textActor.SetMapper(textMapper)
+    textActor.GetPositionCoordinate().SetCoordinateSystemToNormalizedDisplay()
+    textActor.GetPositionCoordinate().SetValue(0.05, 0.2)
     # create a render window
     renderer = vtk.vtkRenderer()
     renderer.SetBackground(colors.GetColor3d("SlateGray"))
@@ -167,7 +195,9 @@ def ShowMeshedField(points, triangles, centers=[], scalars=[], scalarTitle="", s
     renderWindowInteractor = vtk.vtkRenderWindowInteractor()
     renderWindowInteractor.SetRenderWindow(renderWindow)
     renderWindowInteractor.Initialize()
-    style = vtk.vtkInteractorStyleTrackballCamera()
+    # style = vtk.vtkInteractorStyleTrackballCamera()
+    style = MyInteractor(textMapper)
+    style.SetDefaultRenderer(renderer)
     renderWindowInteractor.SetInteractorStyle(style)
     # add the actors to the scene
     renderer.AddActor(meshActor)
@@ -179,6 +209,7 @@ def ShowMeshedField(points, triangles, centers=[], scalars=[], scalarTitle="", s
     if showAxes:
         axesActor = vtk.vtkAxesActor()
         renderer.AddActor(axesActor)
+    renderer.AddActor(textActor)
     # render and interact
     renderWindow.Render()
     renderWindowInteractor.Start()
