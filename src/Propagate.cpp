@@ -58,11 +58,23 @@ int main(int argc, char* argv[])
     std::string outfile(argv[2]);
 
     // load the input field from a file
+    std::cout << std::endl << "=== Source Screen ===" << std::endl;
     Screen *source = new Screen(infile);
+    source->init();
     // print report
     source->writeReport(&cout);
-    source->writeTraceReport(&cout, 0);
 
+    // load the target geometry from a file
+    std::cout << std::endl << "=== Target Screen ===" << std::endl;
+    Screen *target = new Screen(outfile);
+    target->init();
+    // print report
+    target->writeReport(&cout);
+
+    // if the target screen has a pre-defined timing we use that
+    // otherwise we create traces that are guaranteed to capture all
+    // fields emitted from the source screen
+    
     delete source;
     
     return 0;

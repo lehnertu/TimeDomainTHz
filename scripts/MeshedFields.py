@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+
 """
 This module allows the creation and handling of time-domain electromagnetic fields
 defined on  surfaces given by unstructured triangular meshes.
@@ -55,8 +57,8 @@ def MeshArea(points, triangles):
         p1 = points[t[0]]
         p2 = points[t[1]]
         p3 = points[t[2]]
-        r1 = p2-p1
-        r2 = p3-p1
+        r1 = p3-p1
+        r2 = p2-p1
         area.append(0.5*np.linalg.norm(np.cross(r1,r2)))
     return np.array(area)
 
@@ -69,8 +71,8 @@ def MeshNormals(points, triangles):
         p1 = points[t[0]]
         p2 = points[t[1]]
         p3 = points[t[2]]
-        r1 = p2-p1
-        r2 = p3-p1
+        r1 = p3-p1
+        r2 = p2-p1
         n = np.cross(r1,r2)
         normals.append(n / np.linalg.norm(n))
     return np.array(normals)
@@ -107,19 +109,25 @@ def powerLUT():
     return lut
 
 class MyInteractor(vtk.vtkInteractorStyleTrackballCamera):
-
-    def __init__(self, textMapper, parent=None):
+    """
+    Mouse interactor for use by ShowMeshedField.
+    Camera interaction follows the TrackballCamera style.
+    """
+    def __init__(self, textMapper, scalars=[]):
         self.AddObserver("LeftButtonPressEvent", self.leftButtonPressEvent)
         selectedMapper = vtk.vtkDataSetMapper()
         selectedActor = vtk.vtkActor()
         self.text = textMapper
-
+        self.scalars = scalars
     def leftButtonPressEvent(self, obj, event):
         clickPos = self.GetInteractor().GetEventPosition()
         picker = vtk.vtkCellPicker()
         picker.Pick(clickPos[0], clickPos[1], 0, self.GetDefaultRenderer())
         id = picker.GetCellId()
-        self.text.SetInput("Cell index:%d\npos:\nval=" % id)
+        text = "Cell index : %d\n" % id
+        if len(self.scalars) > id:
+            text += "val : %9.6f J/m²\n" % self.scalars[id]
+        self.text.SetInput(text)
         self.OnLeftButtonDown()
         return
 
@@ -190,7 +198,7 @@ def ShowMeshedField(points, triangles, centers=[], scalars=[], scalarTitle="", s
         centerActor.GetProperty().SetColor(colors.GetColor3d("Blue"))
     # add some text to annotate the selected cell
     textMapper = vtk.vtkTextMapper()
-    textMapper.SetInput("Cell index:\npos:\nval=")
+    textMapper.SetInput("nothing")
     tprop = textMapper.GetTextProperty()
     tprop.SetJustificationToLeft()
     tprop.SetColor(colors.GetColor3d("LightBlue"))
@@ -208,8 +216,7 @@ def ShowMeshedField(points, triangles, centers=[], scalars=[], scalarTitle="", s
     renderWindowInteractor = vtk.vtkRenderWindowInteractor()
     renderWindowInteractor.SetRenderWindow(renderWindow)
     renderWindowInteractor.Initialize()
-    # style = vtk.vtkInteractorStyleTrackballCamera()
-    style = MyInteractor(textMapper)
+    style = MyInteractor(textMapper,scalars)
     style.SetDefaultRenderer(renderer)
     renderWindowInteractor.SetInteractorStyle(style)
     # add the actors to the scene
@@ -239,7 +246,7 @@ def WriteMesh(filename, points, triangles, pos):
     hf = h5py.File(filename, 'w')
     h5p = hf.create_dataset('MeshCornerPoints', data=points, dtype='f8')
     h5p.attrs['Ncp'] = len(points)
-    h5p = hf.create_dataset('MeshTriangles', data=triangles, dtype='u4')
+    h5p = hf.create_dataset('MeshTriangles', data=triangles, dtype='i4')
     h5p.attrs['Ntri'] = len(triangles)
     h5p = hf.create_dataset('ObservationPosition', data=pos)
     h5p.attrs['Np'] = len(pos)
@@ -252,7 +259,7 @@ def WriteMeshedField(filename, points, triangles, pos, t0, dt, A):
     hf = h5py.File(filename, 'w')
     h5p = hf.create_dataset('MeshCornerPoints', data=points, dtype='f8')
     h5p.attrs['Ncp'] = len(points)
-    h5p = hf.create_dataset('MeshTriangles', data=triangles, dtype='u4')
+    h5p = hf.create_dataset('MeshTriangles', data=triangles, dtype='i4')
     h5p.attrs['Ntri'] = len(triangles)
     h5p = hf.create_dataset('ObservationPosition', data=pos, dtype='f8')
     h5p.attrs['Np'] = len(pos)

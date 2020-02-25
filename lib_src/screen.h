@@ -26,14 +26,19 @@
 #include "vector.h"
 #include "fields.h"
 
-/*  Memory allocation may go wrong -> throw an exception */
-class Screen_MemoryAllocationError { };
-/*  Assignments of field traces may go wrong -> throw an exception */
-class Screen_IndexOutOfRange { };
 /*  Writing an HDF5 file may go wrong -> throw an exception */
 class Screen_FileWriteError { };
 /*  Reading an HDF5 file may go wrong -> throw an exception */
 class Screen_FileReadError { };
+/*  If normals are not sifficiently aligned -> throw an exception */
+class Screen_NormalsAlignmentError { };
+
+/*! data type for tringle references */
+struct tri_ref {
+    int p1;
+    int p2;
+    int p3;
+};
 
 /*!
  * \class Screen
@@ -64,6 +69,12 @@ public:
     /*! Construct a screen object from an HDF5 file */
     Screen(std::string filename);
     
+    /*! This method computes a number of internal data
+     *  like cell areas, normals and performs some sanity checks.
+     *  It should be called whenever a new screen object has been constructed.
+     */
+    void init();
+    
     /*! Default destructor:<br>
      */
     ~Screen();
@@ -79,6 +90,9 @@ public:
     /*! Get the position of one grid cell */
     Vector get_point(int ip) { return field_points[ip]; }
 
+    /*! Compute the total electromagnetic energy flowing through the screen */
+    double totalEnergy();
+    
     /*! Write a report of the screen geometry and parameters
      *  including some summary field data
      *  onto an output stream
@@ -110,8 +124,23 @@ private:
     /*! the coordinates of the mesh corner points */
     std::vector<Vector> triangle_points;
     
+    /*! lists of references which points belong to the triangles */
+    std::vector<tri_ref> triangles;
+    
     /*! the coordinates of the mesh center points where fields are defined */
     std::vector<Vector> field_points;
+
+    /*! the normal vectors of the cells - computed by init() */
+    std::vector<Vector> normals;
+
+    /*! the average normal vector of the screen - computed by init() */
+    Vector avg_normal;
+    
+    /*! the cell areas - computed by init() */
+    std::vector<double> area;
+    
+    /*! the total screen area - computed by init() */
+    double total_area;
 
     /*! field traces for every mesh cell */
     std::vector<FieldTrace> A;

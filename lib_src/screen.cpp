@@ -34,6 +34,9 @@ Screen::Screen(
     dt = dt_p;
     
     triangle_points = std::vector<Vector>(Ncp);
+    tri_ref empty;
+    empty.p1=-1; empty.p2=-1; empty.p2=-1;
+    triangles = std::vector<tri_ref>(Np,empty);
     field_points = std::vector<Vector>(Np);
     t0 = std::vector<double>(Nt,0.0);
     FieldTrace zero_trace(0.0,dt,Nt);
@@ -70,8 +73,6 @@ Screen::Screen(std::string filename)
         triangle_points[icp] = pos[icp];
     delete pos;
     
-    // read the mesh triangles
-    
     // read the position dataset
     dataset = H5Dopen2(file, "ObservationPosition", H5P_DEFAULT);
     if (dataset<0) throw(Screen_FileReadError());
@@ -95,18 +96,41 @@ Screen::Screen(std::string filename)
         field_points[ip] = pos[ip];
     delete pos;
 
+    // read the mesh triangles
+    dataset = H5Dopen2(file, "MeshTriangles", H5P_DEFAULT);
+    if (dataset<0) throw(Screen_FileReadError());
+    int *buf = new int[3*Np];
+    status = H5Dread (dataset,
+        H5T_NATIVE_INT, 		// mem type id
+        H5S_ALL, 			    // mem space id
+        H5S_ALL,
+        H5P_DEFAULT,			// data transfer properties
+        buf);
+    triangles = std::vector<tri_ref>(Np);
+    int *bt = buf;
+    for (int ip=0; ip<Np; ip++)
+    {   
+        tri_ref tri;
+        tri.p1 = *bt++;
+        tri.p2 = *bt++;
+        tri.p3 = *bt++;
+        triangles[ip] = tri;
+    }
+    delete buf;
+    
     // read the trace timing dataset
     // it is not an error if there are no data available
-    dataset = H5Dopen2(file, "ObservationTime", H5P_DEFAULT);
-    if (dataset<0)
+    if (H5Lexists(file, "ObservationTime", H5P_DEFAULT)<=0)
     {
         // no data available
+        cout << "dataset ObservationTime not existing" << std::endl;
         Nt = 0;
         dt = 0.0;
         t0 = std::vector<double>(Np,0.0);
     }
     else
     {
+        dataset = H5Dopen2(file, "ObservationTime", H5P_DEFAULT);
         attr = H5Aopen_name(dataset, "Nt");
         if (attr<0) throw(Screen_FileReadError());
         status =  H5Aread(attr, H5T_NATIVE_INT, &Nt);
@@ -133,15 +157,16 @@ Screen::Screen(std::string filename)
 
     // read the field dataset
     // it is not an error if there are no data available
-    dataset = H5Dopen2(file, "ElMagField", H5P_DEFAULT);
-    if (dataset<0)
+    if (H5Lexists(file, "ElMagField", H5P_DEFAULT)<=0)
     {
         // no data available
+        cout << "dataset ElMagField not existing" << std::endl;
         FieldTrace zero_trace(0.0,dt,Nt);
         A = std::vector<FieldTrace>(Np,zero_trace);
     }
     else
     {
+        dataset = H5Dopen2(file, "ElMagField", H5P_DEFAULT);
         ElMagField *field = new ElMagField[Np*Nt];
         status = H5Dread (dataset,
             H5T_NATIVE_DOUBLE, 		// mem type id
@@ -167,25 +192,59 @@ Screen::Screen(std::string filename)
     if (status<0) throw(Screen_FileReadError());
 }
 
+void Screen::init()
+{
+    area = std::vector<double>(Np);
+    total_area = 0.0;
+    normals = std::vector<Vector>(Np);
+    avg_normal = Vector(0.0,0.0,0.0);
+    for (int ip=0; ip<Np; ip++)
+    {
+        tri_ref tri = triangles[ip];
+        Vector p1 = triangle_points[tri.p1];
+        Vector p2 = triangle_points[tri.p2];
+        Vector p3 = triangle_points[tri.p3];
+        Vector n = cross( (p3-p1), (p2-p1));
+        area[ip] = n.norm()*0.5;
+        total_area += area[ip];
+        n.normalize();
+        normals[ip] = n;
+        avg_normal += n;
+    };
+    avg_normal.normalize();
+    // check all normals are angled less than 45 deg from the average
+    for (int ip=0; ip<Np; ip++)
+    {
+        if (dot(normals[ip],avg_normal)<0.7) throw(Screen_NormalsAlignmentError());
+    };    
+}
+
 Screen::~Screen()
 {
 }
 
+double Screen::totalEnergy()
+{
+    double total = 0.0;
+    for (int ip=0; ip<Np; ip++)
+    {
+        Vector S = A[ip].Poynting();
+        total += area[ip]*dot(S,normals[ip]*-1.0);
+    }
+    return total;
+}
+
 void Screen::writeReport(std::ostream *st)
 {
-    *st << "TimeDomainTHz - Screen" << std::endl << std::endl;
+    *st << "TimeDomainTHz - Screen" << std::endl;
+    *st << "----------------------" << std::endl;
     *st << "Np=" << Np << "  Nt=" << get_Nt() << std::endl;
-    /*
     st->precision(4);
-    *st << "center = (" << Center.x << ", " << Center.y << ", " << Center.z << ") m" << std::endl;
-    *st << "e_x = (" << xVec.x*1.0e3 << ", " << xVec.y*1.0e3 << ", " << xVec.z*1.0e3 << ") mm" << std::endl;
-    *st << "e_y = (" << yVec.x*1.0e3 << ", " << yVec.y*1.0e3 << ", " << yVec.z*1.0e3 << ") mm" << std::endl;
-    *st << "n   = (" << Normal.x << ", " << Normal.y << ", " << Normal.z << ")" << std::endl;
+    *st << "average normal = (" << avg_normal.x << ", " << avg_normal.y << ", " << avg_normal.z << ")" << std::endl;
     st->precision(6);
-    *st << "dA  = " << dA*1.0e6 << " mm²" << std::endl;
-    *st << "t0  = " << A[Nx/2][Ny/2].get_t0()*1.0e9 << " ns" << std::endl;
-    *st << "dt  = " << get_dt()*1.0e9 << " ns" << std::endl << std::endl;
-    */
+    *st << "total area = " << total_area*1.0e4 << " cm²" << std::endl;
+    *st << "Energy incident on screen = " << totalEnergy()*1.0e6 << " µJ" << std::endl;
+    // find the cell with the highest power density
     int peak_index=-1;
     double peak=0.0;
     Vector Sp;
@@ -198,23 +257,29 @@ void Screen::writeReport(std::ostream *st)
             peak = p.norm();
             peak_index = ip;
         }
-    }
+    };
     st->precision(6);
-    // *st << "Energy incident on screen = " << totalEnergy()*1.0e6 << " µJ" << std::endl << std::endl;
-    Vector p = get_point(peak_index);
-    *st << "pos["  << peak_index << "] =   (" << p.x << ", " << p.y << ", " << p.z << ") m   " << std::endl;
-    *st << "peak energy density =" << peak << " J/m²" << std::endl;
-    *st << "Poynting vector S = (" << Sp.x << ", " << Sp.y << ", " << Sp.z << ") J/m²" << std::endl;
-    *st << "t0=" << A[peak_index].get_t0()*1e9 << " ns  " << std::endl;
+    if (peak_index >= 0)
+    {
+        Vector p = get_point(peak_index);
+        *st << "peak pos["  << peak_index << "] =   (" << p.x << ", " << p.y << ", " << p.z << ") m   " << std::endl;
+        *st << "peak energy density =" << peak << " J/m²" << std::endl;
+        *st << "Poynting vector S = (" << Sp.x << ", " << Sp.y << ", " << Sp.z << ") J/m²" << std::endl;
+        *st << "t0  = " << A[peak_index].get_t0()*1e9 << " ns  " << std::endl;
+        *st << "dt  = " << dt*1.0e9 << " ns" << std::endl;
+    };
     *st << std::endl;
 }
 
 void Screen::writeTraceReport(std::ostream *st, int ip)
 {
-    *st << "trace[" << ip << "]  ";
-    Vector p = get_point(ip);
-    *st << "pos=(" << p.x << ", " << p.y << ", " << p.z << ") m   " << std::endl;
-    *st << "t0=" << A[ip].get_t0()*1e9 << " ns  ";
-    *st << "P=" << A[ip].Poynting().norm() << " J/m²" << std::endl;
+    if ((ip>=0) and (ip<Np))
+    {
+        *st << "trace[" << ip << "]  ";
+        Vector p = get_point(ip);
+        *st << "pos=(" << p.x << ", " << p.y << ", " << p.z << ") m   " << std::endl;
+        *st << "t0=" << A[ip].get_t0()*1e9 << " ns  ";
+        *st << "P=" << A[ip].Poynting().norm() << " J/m²" << std::endl;
+    }
 }
 
