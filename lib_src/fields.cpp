@@ -277,8 +277,21 @@ void FieldTrace::retard(double delta_t, FieldTrace *target)
     {
         std::cout << "retard from t0=" << t0 << " N=" << N << " P=" << Poynting().norm() << std::endl;
         std::cout << "      by delta=" << delta_t << "s" << std::endl;
-        std::cout << "retard   to t0=" << target->get_t0() << " N=" << target->get_N()<< " P=" << target->Poynting().norm() << std::endl;
+        std::cout << "retard   to t0=" << target->get_t0() << " N=" << target->get_N();
+        std::cout << " P=" << target->Poynting().norm() << std::endl;
         throw(FieldTrace_Zero());
     };
+}
+
+void FieldTrace::transform(Vector ex, Vector ey, Vector ez)
+{
+    for (int i=0; i<N; i++)
+    {
+        Vector E = trace[i].E();
+        Vector B = trace[i].B();
+        Vector E_new = Vector(dot(E,ex),dot(E,ey),dot(E,ez));
+        Vector B_new = Vector(dot(B,ex),dot(B,ey),dot(B,ez));
+        trace[i] = ElMagField(E_new, B_new);
+    }
 }
 

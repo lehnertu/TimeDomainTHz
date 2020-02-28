@@ -17,7 +17,7 @@ class MeshedField():
     
     def __init__(self, pts=[], tris=[]):
         """
-        Create an empty MehsedFiled object
+        Create an empty MeshedFiled object
         """
         self.points = pts
         self.triangles = tris
@@ -25,6 +25,7 @@ class MeshedField():
         self.Np = len(tris)
         self.A = np.array([])
         self.t0 = np.array([])
+        self.Nt = 0
         self.dt = 0.0
     
     @classmethod
@@ -93,6 +94,7 @@ class MeshedField():
         mf = cls(points,triangles)
         dataset = hdf['ObservationTime']
         mf.dt = dataset.attrs.get('dt')
+        mf.Nt = dataset.attrs.get('Nt')
         mf.t0 = np.array(dataset)
         dataset = hdf['ElMagField']
         mf.A = np.array(dataset)
@@ -167,7 +169,7 @@ class MeshedField():
         h5p = hf.create_dataset('ObservationPosition', data=self.pos, dtype='f8')
         h5p.attrs['Np'] = self.Np
         h5p = hf.create_dataset('ObservationTime',data=self.t0, dtype='f8')
-        h5p.attrs['Nt'] = self.A.shape[1]
+        h5p.attrs['Nt'] = self.Nt
         h5p.attrs['dt'] = self.dt
         h5p = hf.create_dataset('ElMagField', data=self.A, dtype='f8')
         hf.close()

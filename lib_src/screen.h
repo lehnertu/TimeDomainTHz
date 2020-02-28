@@ -72,6 +72,9 @@ public:
     /*! This method computes a number of internal data
      *  like cell areas, normals and performs some sanity checks.
      *  It should be called whenever a new screen object has been constructed.
+     *
+     *  A local coordinate system is set up for every mesh cell.
+     *  The direction vectors (xi, eta, n) form a right-handed cartesic system.
      */
     void init();
     
@@ -90,7 +93,19 @@ public:
     /*! Get the position of one grid cell */
     Vector get_point(int ip) { return field_points[ip]; }
 
-    /*! Compute the total electromagnetic energy flowing through the screen */
+    /*! Get the start time of one trace */
+    double get_t0(int ip) { return t0[ip]; }
+
+    /*! Determine the neighbourhood of a cell with given index.
+     *  These are all cells that share at least one common point with the indexed cell.
+     *  A buffer of sufficient size to hold the cell indices (up to 20) has to be provided.
+     *  Return value is the number of cells in the neighbourhood (including the indexed cell).
+     */
+    int get_Neighbourhood(int index, int *buffer);
+    
+    /*! Compute the total electromagnetic energy flowing through the screen
+     *  Energy flow vectors opposite the normal vector are counted positive.
+     */
     double totalEnergy();
     
     /*! Write a report of the screen geometry and parameters
@@ -103,8 +118,11 @@ public:
      *  onto an output stream
      */
     void writeTraceReport(std::ostream *st, int ip);
-        
-private:
+    
+// all variables should be defined private:
+// this resctriction is tmporarily removed for development
+public:
+// private:
 
     /*! number of corner points of the grid cells */
     int Ncp;
@@ -130,20 +148,19 @@ private:
     /*! the coordinates of the mesh center points where fields are defined */
     std::vector<Vector> field_points;
 
-    /*! the normal vectors of the cells - computed by init() */
-    std::vector<Vector> normals;
+    /*! the loacl coordinate system of the cells - computed by init() */
+    std::vector<Vector> xi;
+    std::vector<Vector> eta;
+    std::vector<Vector> normal;
 
-    /*! the average normal vector of the screen - computed by init() */
-    Vector avg_normal;
-    
     /*! the cell areas - computed by init() */
     std::vector<double> area;
     
     /*! the total screen area - computed by init() */
     double total_area;
 
-    /*! field traces for every mesh cell */
-    std::vector<FieldTrace> A;
+    /*! pointers to the field traces for every mesh cell */
+    std::vector<FieldTrace*> A;
 
 };
 

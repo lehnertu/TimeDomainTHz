@@ -192,7 +192,7 @@ public:
     /*! compute time derivative of fields */
     FieldTrace derivative();
     
-    /*! compute a retarded trace
+    /*! Compute a retarded trace:
      *  @param delta_t - the amount of retardation in seconds
      *  @param target - the new trace (fields will be overwritten)
      *  The target trace timing will be retained.
@@ -202,6 +202,11 @@ public:
      */
     void retard(double delta_t, FieldTrace *target);
 
+    /*! Transform the fields into another coordinate system.
+     *  The vectors ex, ey and ez are supposed to form a right-handed cartesian system.
+     */
+    void transform(Vector ex, Vector ey, Vector ez);
+    
 private:
 
     int N;

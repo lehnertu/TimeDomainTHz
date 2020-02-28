@@ -57,23 +57,107 @@ int main(int argc, char* argv[])
     std::string infile(argv[1]);
     std::string outfile(argv[2]);
 
+    // **************************************
     // load the input field from a file
+    // **************************************
+
     std::cout << std::endl << "=== Source Screen ===" << std::endl;
     Screen *source = new Screen(infile);
     source->init();
     // print report
     source->writeReport(&cout);
 
+    Vector avg_normal = Vector(0.0,0.0,0.0);
+    Vector avg_xi = Vector(0.0,0.0,0.0);
+    Vector avg_eta = Vector(0.0,0.0,0.0);
+    for (int ip=0; ip<source->get_Np(); ip++)
+    {
+        avg_normal += source->normal[ip];
+        avg_xi += source->xi[ip];
+        avg_eta += source->eta[ip];
+    };
+    std::cout << "n =   (" << avg_normal.x << ", " << avg_normal.y << ", " << avg_normal.z << ")" << std::endl;
+    std::cout << "xi =  (" << avg_xi.x << ", " << avg_xi.y << ", " << avg_xi.z << ")" << std::endl;
+    std::cout << "eta = (" << avg_eta.x << ", " << avg_eta.y << ", " << avg_eta.z << ")" << std::endl;
+
+    // **************************************
+    // test the computation of derivatives
+    // **************************************
+    // temporarily we define most variables of the screen as public
+
+    std::cout << "computing the derivatives of the fields ..." << std::endl;
+    // record the start time
+    timespec start_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
+    
+    int index = 1190;
+    int *nbh = new int[20];
+    int count = source->get_Neighbourhood(index,nbh);
+    std::cout << "neighbourhood size = " << count << std::endl;
+    std::cout << "[";
+    for (int i=0; i<count; i++) std::cout << nbh[i] << " ";
+    std::cout << "]" << std::endl;
+    
+    // get the fields and transform to local coordinates
+    int it=200;
+    ElMagField *field = new ElMagField[20];
+    for (int i=0; i<count; i++)
+    {
+        FieldTrace trace = source->A[nbh[i]];
+        field[i] = trace.get_field(it);
+    }
+    delete field;
+    
+    // an array of 20 pointers to field traces in the local coordinate system
+    FieldTrace* local_trace[20];
+    for (int i=0; i<count; i++)
+    {
+        local_trace[i] = new FieldTrace(source->A[nbh[i]]);
+        local_trace[i]->transform(source->xi[index],source->eta[index],source->normal[index]);
+    };
+    
+    for (int i=0; i<count; i++) delete local_trace[i];
+    delete nbh;
+
+    // record the finish time
+    timespec stop_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop_time);
+    double elapsed = stop_time.tv_sec-start_time.tv_sec +
+        1e-9*(stop_time.tv_nsec-start_time.tv_nsec);
+    std::cout << "time elapsed during computation : " << elapsed << " s" << std::endl;
+    
+    // **************************************
     // load the target geometry from a file
+    // **************************************
+
     std::cout << std::endl << "=== Target Screen ===" << std::endl;
     Screen *target = new Screen(outfile);
     target->init();
     // print report
     target->writeReport(&cout);
+    
+    avg_normal = Vector(0.0,0.0,0.0);
+    avg_xi = Vector(0.0,0.0,0.0);
+    avg_eta = Vector(0.0,0.0,0.0);
+    for (int ip=0; ip<target->get_Np(); ip++)
+    {
+        avg_normal += target->normal[ip];
+        avg_xi += target->xi[ip];
+        avg_eta += target->eta[ip];
+    };
+    std::cout << "n =   (" << avg_normal.x << ", " << avg_normal.y << ", " << avg_normal.z << ")" << std::endl;
+    std::cout << "xi =  (" << avg_xi.x << ", " << avg_xi.y << ", " << avg_xi.z << ")" << std::endl;
+    std::cout << "eta = (" << avg_eta.x << ", " << avg_eta.y << ", " << avg_eta.z << ")" << std::endl;
 
-    // if the target screen has a pre-defined timing we use that
-    // otherwise we create traces that are guaranteed to capture all
-    // fields emitted from the source screen
+    double min_t0 = 1.0e30;
+    double max_t0 = -1.0e30;
+    for (int i=0; i<target->get_Np(); i++)
+    {
+        double t0 = target->get_t0(i);
+        if (t0>max_t0) max_t0=t0;
+        if (t0<min_t0) min_t0=t0;
+    }
+    std::cout << "target start timing range (" << min_t0 << ", " << max_t0 << ")" << std::endl;
     
     delete source;
     
