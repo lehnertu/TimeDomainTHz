@@ -27,8 +27,18 @@ else(OPENMP_FOUND)
   message("ERROR: OpenMP could not be found.")
 endif(OPENMP_FOUND)
 
+# EIGEN library
+find_package (Eigen3 3.3 REQUIRED NO_MODULE)
+if (EIGEN3_FOUND)
+    message(STATUS "Eigen3 includes ${EIGEN3_INCLUDE_DIR}")
+else (EIGEN3_FOUND)
+    message(STATUS "Eigen3 not found, trying ${PROJECT_SOURCE_DIR}/lib/eigen")
+    set(EIGEN3_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/lib/eigen")
+endif (EIGEN3_FOUND)
+
 # where to find header files
-include_directories( ${PROJECT_SOURCE_DIR}/lib_src 
+include_directories( ${PROJECT_SOURCE_DIR}/lib_src
+                     ${PROJECT_SOURCE_DIR}/lib/eigen
                      ${HDF5_INCLUDE_DIRS} )
 
 # we put all objects into a library that can be linked to the various executables
@@ -43,5 +53,7 @@ add_executable(Propagate ${PROJECT_SOURCE_DIR}/src/Propagate.cpp)
 target_link_libraries(Propagate
         thzlib
         ${HDF5_LIBRARIES}
+        Eigen3::Eigen
         ${ZLIB_LIBRARY_RELEASE} )
+
 

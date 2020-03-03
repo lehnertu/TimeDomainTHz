@@ -44,6 +44,8 @@
 #include "fields.h"
 #include "screen.h"
 
+#include <Eigen/Dense>
+
 int main(int argc, char* argv[])
 {
     std::cout << std::endl;
@@ -85,6 +87,14 @@ int main(int argc, char* argv[])
     // **************************************
     // temporarily we define most variables of the screen as public
 
+    // test the EIGEN library
+    Eigen::MatrixXf A = Eigen::MatrixXf::Random(3, 2);
+    cout << "Here is the matrix A:\n" << A << endl;
+    Eigen::VectorXf b = Eigen::VectorXf::Random(3);
+    cout << "Here is the right hand side b:\n" << b << endl;
+    cout << "The least-squares solution is:\n"
+        << A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(b) << endl;
+
     std::cout << "computing the derivatives of the fields ..." << std::endl;
     // record the start time
     timespec start_time;
@@ -97,16 +107,6 @@ int main(int argc, char* argv[])
     std::cout << "[";
     for (int i=0; i<count; i++) std::cout << nbh[i] << " ";
     std::cout << "]" << std::endl;
-    
-    // get the fields and transform to local coordinates
-    int it=200;
-    ElMagField *field = new ElMagField[20];
-    for (int i=0; i<count; i++)
-    {
-        FieldTrace trace = source->A[nbh[i]];
-        field[i] = trace.get_field(it);
-    }
-    delete field;
     
     // an array of 20 pointers to field traces in the local coordinate system
     FieldTrace* local_trace[20];
@@ -160,6 +160,7 @@ int main(int argc, char* argv[])
     std::cout << "target start timing range (" << min_t0 << ", " << max_t0 << ")" << std::endl;
     
     delete source;
+    delete target;
     
     return 0;
 }
