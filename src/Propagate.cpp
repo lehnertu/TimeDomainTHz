@@ -87,21 +87,13 @@ int main(int argc, char* argv[])
     // **************************************
     // temporarily we define most variables of the screen as public
 
-    // test the EIGEN library
-    Eigen::MatrixXf A = Eigen::MatrixXf::Random(3, 2);
-    cout << "Here is the matrix A:\n" << A << endl;
-    Eigen::VectorXf b = Eigen::VectorXf::Random(3);
-    cout << "Here is the right hand side b:\n" << b << endl;
-    cout << "The least-squares solution is:\n"
-        << A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(b) << endl;
-
     std::cout << "computing the derivatives of the fields ..." << std::endl;
     // record the start time
     timespec start_time;
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
     
     int index = 1190;
-    int *nbh = new int[20];
+    int nbh[20];
     int count = source->get_Neighbourhood(index,nbh);
     std::cout << "neighbourhood size = " << count << std::endl;
     std::cout << "[";
@@ -110,14 +102,36 @@ int main(int argc, char* argv[])
     
     // an array of 20 pointers to field traces in the local coordinate system
     FieldTrace* local_trace[20];
+    Eigen::VectorXd Ex(count);
+    Eigen::VectorXd xi(count), eta(count), xi2(count), eta2(count), xieta(count), one(count);
     for (int i=0; i<count; i++)
     {
         local_trace[i] = new FieldTrace(source->A[nbh[i]]);
+        Ex(i) = local_trace[i]->get_field(200).E().x;
+        Vector local_coo = source->get_point(nbh[i]) - source->get_point(index);
+        local_coo.transform(source->xi[index],source->eta[index],source->normal[index]);
+        one(i) = 1.0;
+        xi(i) = local_coo.x;
+        eta(i) = local_coo.y;
+        xi2(i) = local_coo.x * local_coo.x;
+        eta2(i) = local_coo.y * local_coo.y;
+        xieta(i) = local_coo.x * local_coo.y;
         local_trace[i]->transform(source->xi[index],source->eta[index],source->normal[index]);
     };
-    
+    std::cout << "Ex = [" << Ex << "]" << std::endl;
+    // we solve anequation A x = Ex in a least-squares sense
+    Eigen::MatrixXd A(count,6);
+    A.col(0) << one;
+    A.col(1) << xi;
+    A.col(2) << eta;
+    A.col(3) << xi2;
+    A.col(4) << eta2;
+    A.col(5) << xieta;
+    cout << "Here is the matrix A:\n" << A << endl;
+    cout << "Here is the right hand side Ex:\n" << Ex << endl;
+    cout << "The least-squares solution is:\n"
+        << A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(Ex) << endl;
     for (int i=0; i<count; i++) delete local_trace[i];
-    delete nbh;
 
     // record the finish time
     timespec stop_time;

@@ -93,6 +93,11 @@ class Vector
     /*! Make the vector unit length */
     void normalize();
 
+    /*! Transform the vector into another coordinate system.
+     *  The vectors ex, ey and ez are supposed to form a right-handed cartesian system.
+     */
+    void transform(Vector ex, Vector ey, Vector ez);
+
   private:
 
 };

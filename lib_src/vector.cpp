@@ -142,6 +142,15 @@ void Vector::normalize()
   z /= abs;
 }
 
+void Vector::transform(Vector ex, Vector ey, Vector ez)
+{
+  Vector temp = *this;
+  x = dot(temp,ex);
+  y = dot(temp,ey);
+  z = dot(temp,ez);
+}
+
+
 double dot(Vector a, Vector b)
 {
   double temp;
