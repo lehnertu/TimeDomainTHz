@@ -9,6 +9,7 @@ import vtk
 import pygmsh
 import numpy as np
 from scipy import constants
+import matplotlib.pyplot as plt
 import h5py
 
 # --------------------------------------------------------------------------
@@ -174,7 +175,7 @@ class MeshedField():
         h5p = hf.create_dataset('ElMagField', data=self.A, dtype='f8')
         hf.close()
 
-    def ShowMeshedField(self, scalars=[], scalarTitle="", showAxes=False, showCenters=True):
+    def ShowMeshedField(self, scalars=[], scalarTitle="", showAxes=False, showCenters=True, pickAction=None):
         """
         Render a display of a mesh geometry using VTK.
         If given a scalar field is used to color the triangles accordingly.
@@ -258,7 +259,7 @@ class MeshedField():
         renderWindowInteractor = vtk.vtkRenderWindowInteractor()
         renderWindowInteractor.SetRenderWindow(renderWindow)
         renderWindowInteractor.Initialize()
-        style = MyInteractor(textMapper,scalars)
+        style = MyInteractor(textMapper,scalars,pickAction)
         style.SetDefaultRenderer(renderer)
         renderWindowInteractor.SetInteractorStyle(style)
         # add the actors to the scene
@@ -280,6 +281,47 @@ class MeshedField():
         del renderWindow
         del renderWindowInteractor
 
+    def ShowFieldTrace(self, index):
+        trace = self.A[index]
+        NOTS = trace.shape[0]
+        t = np.linspace(self.t0[index],self.t0[index]+(NOTS-1)*self.dt, NOTS)
+        # get the individual field components
+        Ex = trace[:,0]
+        Ey = trace[:,1]
+        Ez = trace[:,2]
+        Bx = trace[:,3]
+        By = trace[:,4]
+        Bz = trace[:,5]
+        # prepare the plot geometry
+        left, width = 0.15, 0.80
+        rect1 = [left, 0.55, width, 0.40]  #left, bottom, width, height
+        rect2 = [left, 0.08, width, 0.40]
+        fig = plt.figure(1,figsize=(8,6))
+        ax1 = fig.add_axes(rect1)
+        ax2 = fig.add_axes(rect2, sharex=ax1)
+        # plot the time-trace of the fields
+        l1 = ax1.plot(t, Ex, "r-", label=r'$E_x$')
+        l2 = ax1.plot(t, Ey, "b-", label=r'$E_y$')
+        l3 = ax1.plot(t, Ez, "g-", label=r'$E_z$')
+        ax1.set_ylabel(r'$E$ [V/m]')
+        lines = l1 + l2 + l3
+        labels = [l.get_label() for l in lines]
+        ax1.legend(lines,labels,loc='upper right')
+        for label in ax1.get_xticklabels():
+            label.set_visible(False)
+        ax1.grid(True)
+        l4 = ax2.plot(t, Bx, "r-", label=r'$B_x$')
+        l5 = ax2.plot(t, By, "b-", label=r'$B_y$')
+        l6 = ax2.plot(t, Bz, "g-", label=r'$B_z$')
+        ax2.set_ylabel(r'$B$ [T]')
+        ax2.set_xlabel(r't [ns]')
+        lines = l4 + l5 + l6
+        labels = [l.get_label() for l in lines]
+        ax2.legend(lines,labels,loc='upper right')
+        ax2.grid(True)
+        plt.show()
+        
+    
 # --------------------------------------------------------------------------
 #   helper code for visualization
 # --------------------------------------------------------------------------
@@ -288,13 +330,15 @@ class MyInteractor(vtk.vtkInteractorStyleTrackballCamera):
     """
     Mouse interactor for use by ShowMeshedField.
     Camera interaction follows the TrackballCamera style.
+    When a cell is selected the specified pickAction is performed.
     """
-    def __init__(self, textMapper, scalars=[]):
+    def __init__(self, textMapper, scalars=[], pickAction=None):
         self.AddObserver("LeftButtonPressEvent", self.leftButtonPressEvent)
         selectedMapper = vtk.vtkDataSetMapper()
         selectedActor = vtk.vtkActor()
         self.text = textMapper
         self.scalars = scalars
+        self.pickAction = pickAction
     def leftButtonPressEvent(self, obj, event):
         clickPos = self.GetInteractor().GetEventPosition()
         picker = vtk.vtkCellPicker()
@@ -304,6 +348,7 @@ class MyInteractor(vtk.vtkInteractorStyleTrackballCamera):
         if len(self.scalars) > id:
             text += "val : %9.6f J/m²\n" % self.scalars[id]
         self.text.SetInput(text)
+        if self.pickAction != None: self.pickAction(id)
         self.OnLeftButtonDown()
         return
 
