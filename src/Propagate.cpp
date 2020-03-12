@@ -74,9 +74,9 @@ int main(int argc, char* argv[])
     Vector avg_eta = Vector(0.0,0.0,0.0);
     for (int ip=0; ip<source->get_Np(); ip++)
     {
-        avg_normal += source->normal[ip];
-        avg_xi += source->xi[ip];
-        avg_eta += source->eta[ip];
+        avg_normal += source->get_normal(ip);
+        avg_xi += source->get_xi(ip);
+        avg_eta += source->get_eta(ip);
     };
     avg_normal /= source->get_Np();
     avg_xi /= source->get_Np();
@@ -99,7 +99,7 @@ int main(int argc, char* argv[])
     std::vector<FieldTrace*> source_dA_dt = std::vector<FieldTrace*>(source->get_Np());
     for (int ip=0; ip<source->get_Np(); ip++)
     {
-        FieldTrace source_trace = source->A[ip];
+        FieldTrace source_trace = source->get_trace(ip);
         FieldTrace *deriv = new FieldTrace(source_trace.derivative());
         source_dA_dt[ip] = deriv;
     }
@@ -115,7 +115,7 @@ int main(int argc, char* argv[])
     std::vector<FieldTrace*> source_dA_dn = std::vector<FieldTrace*>(source->get_Np());
     for (int ip=0; ip<source->get_Np(); ip++)
     {
-        FieldTrace *deriv = new FieldTrace(source->A[ip]);
+        FieldTrace *deriv = new FieldTrace(source->get_trace(ip));
         source_dA_dn[ip] = deriv;
     }
 
@@ -140,9 +140,9 @@ int main(int argc, char* argv[])
         // get the coordinates of the neighbours in the cell-local coordinate system
         // assemble these into a matrix A
         Vector local_ref = source->get_point(index);
-        Vector local_xi = source->xi[index];
-        Vector local_eta = source->eta[index];
-        Vector local_n = source->normal[index];
+        Vector local_xi = source->get_xi(index);
+        Vector local_eta = source->get_eta(index);
+        Vector local_n = source->get_normal(index);
         Eigen::VectorXd xi(count), eta(count), xi2(count), eta2(count), xieta(count), one(count);
         for (int i=0; i<count; i++)
         {
@@ -164,11 +164,11 @@ int main(int argc, char* argv[])
         A.col(5) << xieta;
         
         // get the field traces of the neighbourhood in the local coordinate system
-        FieldTrace* local_trace = new FieldTrace(source->A[index]);
+        FieldTrace* local_trace = new FieldTrace(source->get_trace(index));
         FieldTrace* nbh_trace[24];
         for (int i=0; i<count; i++)
         {
-            nbh_trace[i] = new FieldTrace(source->A[nbh[i]]);
+            nbh_trace[i] = new FieldTrace(source->get_trace(nbh[i]));
             nbh_trace[i]->transform(local_xi,local_eta,local_n);
         };
         
@@ -270,9 +270,9 @@ int main(int argc, char* argv[])
     avg_eta = Vector(0.0,0.0,0.0);
     for (int ip=0; ip<target->get_Np(); ip++)
     {
-        avg_normal += target->normal[ip];
-        avg_xi += target->xi[ip];
-        avg_eta += target->eta[ip];
+        avg_normal += target->get_normal(ip);
+        avg_xi += target->get_xi(ip);
+        avg_eta += target->get_eta(ip);
     };
     avg_normal /= target->get_Np();
     avg_xi /= target->get_Np();

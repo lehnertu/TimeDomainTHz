@@ -96,6 +96,14 @@ public:
     /*! Get the start time of one trace */
     double get_t0(int ip) { return t0[ip]; }
 
+    /*! Get the cell-local coordinate system */
+    Vector get_xi(int ip) { return xi[ip]; }
+    Vector get_eta(int ip) { return eta[ip]; }
+    Vector get_normal(int ip) { return normal[ip]; }
+
+    /*! Get the fields of one cell */
+    FieldTrace get_trace(int ip) { return *A[ip]; }
+    
     /*! Determine the neighbourhood of a cell with given index.
      *  These are all cells that share at least one common point with the indexed cell.
      *  A buffer of sufficient size to hold the cell indices (up to 20) has to be provided.
@@ -119,10 +127,7 @@ public:
      */
     void writeTraceReport(std::ostream *st, int ip);
     
-// all variables should be defined private:
-// this resctriction is tmporarily removed for development
-public:
-// private:
+private:
 
     /*! number of corner points of the grid cells */
     int Ncp;
@@ -148,7 +153,7 @@ public:
     /*! the coordinates of the mesh center points where fields are defined */
     std::vector<Vector> field_points;
 
-    /*! the loacl coordinate system of the cells - computed by init() */
+    /*! the local coordinate system of the cells - computed by init() */
     std::vector<Vector> xi;
     std::vector<Vector> eta;
     std::vector<Vector> normal;
