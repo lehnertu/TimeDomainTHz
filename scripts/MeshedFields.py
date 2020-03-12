@@ -7,6 +7,7 @@ defined on  surfaces given by unstructured triangular meshes.
 
 import vtk
 import pygmsh
+import math
 import numpy as np
 from scipy import constants
 import matplotlib.pyplot as plt
@@ -144,6 +145,15 @@ class MeshedField():
             Energy.append((SVec.sum(axis=0))*self.dt)
         return np.array(Energy)
 
+    def FieldAtTime(self,t):
+        """
+        Compute the fields of all field traces at a given time
+        """
+        field = []
+        for i, trace in enumerate(self.A):
+            field.append(InterpolateTrace(trace,self.t0[i],self.dt,t))
+        return np.array(field)
+
     def WriteMesh(self, filename):
         """
         Write the meshed geometry to an HDF5 file.
@@ -175,7 +185,7 @@ class MeshedField():
         h5p = hf.create_dataset('ElMagField', data=self.A, dtype='f8')
         hf.close()
 
-    def ShowMeshedField(self, scalars=[], scalarTitle="", showAxes=False, showCenters=True, pickAction=None):
+    def ShowMeshedField(self, scalars=[], scalarTitle="", showAxes=False, showCenters=True, pickAction=None, lut=None):
         """
         Render a display of a mesh geometry using VTK.
         If given a scalar field is used to color the triangles accordingly.
@@ -201,10 +211,10 @@ class MeshedField():
                 scal.SetNumberOfValues(self.Np)
                 for i,val in enumerate(scalars):
                     scal.SetValue(i,val)
-                lut = powerLUT()
+                if lut==None: lut = powerLUT()
                 meshData.GetCellData().SetScalars(scal)
                 meshMapper.SetLookupTable(lut)
-                meshMapper.SetScalarRange(0.0,np.max(scalars))
+                meshMapper.SetScalarRange(np.min(scalars),np.max(scalars))
                 # create a color scale bar
                 sbar = vtk.vtkScalarBarActor()
                 sbar.SetLookupTable(lut)
@@ -321,6 +331,23 @@ class MeshedField():
         ax2.grid(True)
         plt.show()
         
+# --------------------------------------------------------------------------
+#   helper code for field traces
+# --------------------------------------------------------------------------
+
+def InterpolateTrace(trace,t0,dt,t):
+    """
+    Interpolate the fields of a given time trace starting at t0
+    with a time step dt to a given time t
+    """
+    NOTS = trace.shape[0]
+    if (t<t0) or (t>t0+(NOTS-1)*dt):
+        field = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    else:
+        index = int(math.floor((t-t0)/dt))
+        frac = (t-t0)/dt-index
+        field = trace[index]*(1.0-frac) + trace[index+1]*frac
+    return field
     
 # --------------------------------------------------------------------------
 #   helper code for visualization
@@ -345,8 +372,8 @@ class MyInteractor(vtk.vtkInteractorStyleTrackballCamera):
         picker.Pick(clickPos[0], clickPos[1], 0, self.GetDefaultRenderer())
         id = picker.GetCellId()
         text = "Cell index : %d\n" % id
-        if len(self.scalars) > id:
-            text += "val : %9.6f J/m²\n" % self.scalars[id]
+        if (len(self.scalars)>id) and (id>=0):
+            text += "scalar : %9.6f\n" % self.scalars[id]
         self.text.SetInput(text)
         if self.pickAction != None: self.pickAction(id)
         self.OnLeftButtonDown()
@@ -370,3 +397,19 @@ def powerLUT():
         lut.SetTableValue(i, *rgb)
     return lut
 
+def phaseLUT():
+    lut = vtk.vtkLookupTable()
+    nc = 256
+    ctf = vtk.vtkColorTransferFunction()
+    # black-red-yellow-white
+    # ctf.SetColorSpaceToDiverging()
+    ctf.AddRGBPoint(0.0, 1.0, 0.0, 0.0)
+    ctf.AddRGBPoint(0.5, 0.0, 0.0, 0.0)
+    ctf.AddRGBPoint(1.0, 0.0, 0.0, 1.0)
+    lut.SetNumberOfTableValues(nc)
+    lut.Build()
+    for i in range(0, nc):
+        rgb = list(ctf.GetColor(float(i) / nc))
+        rgb.append(1.0)
+        lut.SetTableValue(i, *rgb)
+    return lut
