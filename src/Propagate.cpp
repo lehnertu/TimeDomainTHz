@@ -351,7 +351,7 @@ int main(int argc, char* argv[])
         };
         
         target->set_trace(index, propagated_trace);
-        target->writeTraceReport(&std::cout, index);
+        // target->writeTraceReport(&std::cout, index);
     }
 
     // record the finish time
