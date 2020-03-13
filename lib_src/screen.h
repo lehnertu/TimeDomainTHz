@@ -101,8 +101,14 @@ public:
     Vector get_eta(int ip) { return eta[ip]; }
     Vector get_normal(int ip) { return normal[ip]; }
 
+    /*! Get the area of one cell */
+    double get_area(int ip) { return area[ip]; }
+
     /*! Get the fields of one cell */
     FieldTrace get_trace(int ip) { return *A[ip]; }
+
+    /*! Set the fields of one cell */
+    void set_trace(int ip, FieldTrace trace) { *A[ip]=trace; };
     
     /*! Determine the neighbourhood of a cell with given index.
      *  These are all cells that share at least one common point with the indexed cell.

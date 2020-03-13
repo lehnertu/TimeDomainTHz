@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
     // **************************************
     // test the computation of derivatives
     // **************************************
-    // temporarily we define most variables of the screen as public
+
     timespec start_time, stop_time;
 
     std::cout << "computing the time derivatives of the fields ..." << std::endl;
@@ -289,8 +289,78 @@ int main(int argc, char* argv[])
         if (t0>max_t0) max_t0=t0;
         if (t0<min_t0) min_t0=t0;
     }
-    std::cout << "target start timing range (" << min_t0 << ", " << max_t0 << ")" << std::endl;
+    std::cout << "target start timing range (" << min_t0 << ", " << max_t0 << ")" << std::endl << std::endl;
 
+    // **************************************
+    // propagate the fields to the target
+    // **************************************
+    
+    std::cout << "propagating the fields ..." << std::endl;
+    // record the start time
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
+
+    for (int index=0; index<source->get_Np(); index++)
+    {
+        Vector target_pos = target->get_point(index);
+        // this is the result sum (copy of the target trace)
+        FieldTrace propagated_trace = target->get_trace(index);
+        propagated_trace.zero();
+        // this is the component to be added to the result trace
+        FieldTrace component = propagated_trace;
+        
+        for (int isource=0; isource<source->get_Np(); isource++)
+        {
+            Vector source_pos = source->get_point(isource);
+            double dA = source->get_area(isource)/(4.0*Pi);
+            Vector RVec = target_pos - source_pos;
+            double R = RVec.norm();
+            double R2 = R*R;
+            double R3 = R2*R;
+            Vector Normal = source->get_normal(isource);
+            try
+            {
+                FieldTrace t1 = source->get_trace(isource);
+                t1.retard(R/SpeedOfLight, &component);
+                propagated_trace += component * (-dot(RVec,Normal)/R3) * dA;
+            }
+            catch(FieldTrace_Zero exc)
+            {
+                std::cout << "FieldTrace first term zero exception at i(source)=" << isource << std::endl;
+            }
+            try
+            {
+                FieldTrace t2 = *source_dA_dt[isource];
+                t2.retard(R/SpeedOfLight, &component);
+                propagated_trace += component * (-dot(RVec,Normal)/(R2*SpeedOfLight)) * dA;
+            }
+            catch(FieldTrace_Zero exc)
+            {
+                std::cout << "FieldTrace second term zero exception at i(source)=" << isource << std::endl;
+            }
+            try
+            {
+                FieldTrace t3 = *source_dA_dn[isource];
+                t3.retard(R/SpeedOfLight, &component);
+                // TODO: why is this term positive - should be negative
+                propagated_trace += component * (1.0/R) * dA;
+            }
+            catch(FieldTrace_Zero exc)
+            {
+                std::cout << "FieldTrace third term zero exception at i(source)=" << isource << std::endl;
+            }
+        };
+        
+        target->set_trace(index, propagated_trace);
+        target->writeTraceReport(&std::cout, index);
+    }
+
+    // record the finish time
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop_time);
+    elapsed = stop_time.tv_sec-start_time.tv_sec +
+        1e-9*(stop_time.tv_nsec-start_time.tv_nsec);
+    std::cout << "time elapsed during computation : " << elapsed << " s" << std::endl;
+    
+    // release all allocated memory
     for (int ip=0; ip<source->get_Np(); ip++) delete source_dA_dt[ip];
     for (int ip=0; ip<source->get_Np(); ip++) delete source_dA_dn[ip];
     delete source;
