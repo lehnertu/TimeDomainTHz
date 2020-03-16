@@ -60,6 +60,8 @@ Screen::Screen(std::string filename)
     if (attr<0) throw(Screen_FileReadError());
     status =  H5Aread(attr, H5T_NATIVE_INT, &Ncp);
     if (status<0) throw(Screen_FileReadError());
+    status = H5Aclose(attr);
+    if (status<0) throw(Screen_FileReadError());
     Vector *pos = new Vector[Ncp];
     status = H5Dread (dataset,
         H5T_NATIVE_DOUBLE, 		// mem type id
@@ -81,6 +83,8 @@ Screen::Screen(std::string filename)
     attr = H5Aopen_name(dataset, "Np");
     if (attr<0) throw(Screen_FileReadError());
     status =  H5Aread(attr, H5T_NATIVE_INT, &Np);
+    if (status<0) throw(Screen_FileReadError());
+    status = H5Aclose(attr);
     if (status<0) throw(Screen_FileReadError());
     // create and fill a buffer
     pos = new Vector[Np];
@@ -108,6 +112,8 @@ Screen::Screen(std::string filename)
         H5S_ALL,
         H5P_DEFAULT,			// data transfer properties
         buf);
+    status = H5Dclose(dataset);
+    if (status<0) throw(Screen_FileReadError());
     triangles = std::vector<tri_ref>(Np);
     int *bt = buf;
     for (int ip=0; ip<Np; ip++)
@@ -137,9 +143,13 @@ Screen::Screen(std::string filename)
         if (attr<0) throw(Screen_FileReadError());
         status =  H5Aread(attr, H5T_NATIVE_INT, &Nt);
         if (status<0) throw(Screen_FileReadError());
+        status = H5Aclose(attr);
+        if (status<0) throw(Screen_FileReadError());
         attr = H5Aopen_name(dataset, "dt");
         if (attr<0) throw(Screen_FileReadError());
         status =  H5Aread(attr, H5T_NATIVE_DOUBLE, &dt);
+        if (status<0) throw(Screen_FileReadError());
+        status = H5Aclose(attr);
         if (status<0) throw(Screen_FileReadError());
         double *t0_buf = new double[Np];
         status = H5Dread (dataset,
@@ -178,6 +188,8 @@ Screen::Screen(std::string filename)
             H5S_ALL,
             H5P_DEFAULT,			// data transfer properties
             field);
+        status = H5Dclose(dataset);
+        if (status<0) throw(Screen_FileReadError());
         // transfer the data into the internal data structures
         FieldTrace trace(0.0, dt, Nt);
         A = std::vector<FieldTrace*>(Np);
@@ -338,5 +350,318 @@ void Screen::writeTraceReport(std::ostream *st, int ip)
         *st << "t0=" << A[ip]->get_t0()*1e9 << " ns  ";
         *st << "P=" << A[ip]->Poynting().norm() << " J/m²" << std::endl;
     }
+}
+
+void Screen::writeFieldHDF5(std::string filename)
+{
+    herr_t status;
+    hid_t atts, att;
+    hid_t dataspace, dcpl, dataset;
+    
+    cout << "writing HDF5 file " << filename << endl;
+    // Create a new file using the default properties.
+    hid_t file = H5Fcreate (filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    // hid_t file = H5Fopen (filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+    if (file<0) throw(Screen_FileWriteError());
+
+    // write the mesh corner points
+    cout << "writing mesh points" << endl;
+    hsize_t cdims[2];
+    cdims[0] = Ncp;
+    cdims[1] = 3;
+    // create dataspace
+    // Setting maximum size to NULL sets the maximum size to be the current size.
+    dataspace = H5Screate_simple (2, cdims, NULL);
+    if (dataspace<0) throw(Screen_FileWriteError());
+    cout << " .. dataspace OK " << dataspace << endl;
+    // buffer the data
+    double *cbuffer = new double[Ncp*3];
+    double *cbp = cbuffer;
+    for (int icp=0; icp<Ncp; icp++)
+	{
+        Vector pos = triangle_points[icp];
+        *cbp++ = pos.x;
+        *cbp++ = pos.y;
+        *cbp++ = pos.z;
+    };
+    // Create the dataset creation property list
+    dcpl = H5Pcreate (H5P_DATASET_CREATE);
+    if (dcpl<0) throw(Screen_FileWriteError());
+    cout << " .. dcpl OK " << dcpl << endl;
+    // Create the dataset.
+    dataset = H5Dcreate(file,
+        "MeshCornerPoints",		// dataset name
+        H5T_NATIVE_DOUBLE,		// data type
+        dataspace, H5P_DEFAULT,
+        dcpl, H5P_DEFAULT);
+    if (dataset<0) throw(Screen_FileWriteError());
+    // Write the data to the dataset
+    status = H5Dwrite (dataset,
+        H5T_NATIVE_DOUBLE, 		// mem type id
+        H5S_ALL, 			    // mem space id
+        dataspace,
+        H5P_DEFAULT,			// data transfer properties
+        cbuffer);
+    if (status<0) throw(Screen_FileWriteError());
+    cout << " .. data OK status=" << status << endl;
+    // attach scalar attributes
+    atts  = H5Screate(H5S_SCALAR);
+    if (atts<0) throw(Screen_FileWriteError());
+    att = H5Acreate2(dataset, "Ncp", H5T_NATIVE_INT, atts, H5P_DEFAULT, H5P_DEFAULT);
+    if (att<0) throw(Screen_FileWriteError());
+    status = H5Awrite(att, H5T_NATIVE_INT, &Ncp);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Aclose (att);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Sclose (atts);
+    if (status<0) throw(Screen_FileWriteError());
+    // Close and release resources.
+    status = H5Pclose (dcpl);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Dclose (dataset);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Sclose (dataspace);
+    if (status<0) throw(Screen_FileWriteError());
+    delete cbuffer;
+
+    // write the position dataset
+    cout << "writing mesh center points" << endl;
+    hsize_t pdims[2];
+    pdims[0] = Np;
+    pdims[1] = 3;
+    // create dataspace
+    // Setting maximum size to NULL sets the maximum size to be the current size.
+    dataspace = H5Screate_simple (2, pdims, NULL);
+    if (dataspace<0) throw(Screen_FileWriteError());
+    cout << " .. dataspace OK " << dataspace << endl;
+    // buffer the data
+    double *pbuffer = new double[Np*3];
+    double *pbp = pbuffer;
+    for (int ip=0; ip<Np; ip++)
+	{
+        Vector pos = field_points[ip];
+        *pbp++ = pos.x;
+        *pbp++ = pos.y;
+        *pbp++ = pos.z;
+    };
+    // Create the dataset creation property list
+    dcpl = H5Pcreate (H5P_DATASET_CREATE);
+    if (dcpl<0) throw(Screen_FileWriteError());
+    cout << " .. dcpl OK " << dcpl << endl;
+    // Create the dataset.
+    dataset = H5Dcreate(file,
+        "ObservationPosition",	// dataset name
+        H5T_NATIVE_DOUBLE,		// data type
+        dataspace, H5P_DEFAULT,
+        dcpl, H5P_DEFAULT);
+    if (dataset<0) throw(Screen_FileWriteError());
+    // Write the data to the dataset
+    status = H5Dwrite (dataset,
+        H5T_NATIVE_DOUBLE, 		// mem type id
+        H5S_ALL, 			    // mem space id
+        dataspace,
+        H5P_DEFAULT,			// data transfer properties
+        pbuffer);
+    if (status<0) throw(Screen_FileWriteError());
+    cout << " .. data OK status=" << status << endl;
+    // attach scalar attributes
+    atts  = H5Screate(H5S_SCALAR);
+    if (atts<0) throw(Screen_FileWriteError());
+    att = H5Acreate2(dataset, "Np", H5T_NATIVE_INT, atts, H5P_DEFAULT, H5P_DEFAULT);
+    if (att<0) throw(Screen_FileWriteError());
+    status = H5Awrite(att, H5T_NATIVE_INT, &Np);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Aclose (att);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Sclose (atts);
+    if (status<0) throw(Screen_FileWriteError());
+    // Close and release resources.
+    status = H5Pclose (dcpl);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Dclose (dataset);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Sclose (dataspace);
+    if (status<0) throw(Screen_FileWriteError());
+    delete pbuffer;
+
+    // write the mesh triangles
+    cout << "writing mesh triangles" << endl;
+    hsize_t tdims[2];
+    tdims[0] = Np;
+    tdims[1] = 3;
+    // create dataspace
+    // Setting maximum size to NULL sets the maximum size to be the current size.
+    dataspace = H5Screate_simple (2, tdims, NULL);
+    if (dataspace<0) throw(Screen_FileWriteError());
+    cout << " .. dataspace OK " << dataspace << endl;
+    // buffer the data
+    int *tribuffer = new int[Np*3];
+    int *tribp = tribuffer;
+    for (int ip=0; ip<Np; ip++)
+	{
+	    tri_ref tri = triangles[ip];
+        *tribp++ = tri.p1;
+        *tribp++ = tri.p2;
+        *tribp++ = tri.p3;
+    };
+    // Create the dataset creation property list
+    dcpl = H5Pcreate (H5P_DATASET_CREATE);
+    if (dcpl<0) throw(Screen_FileWriteError());
+    cout << " .. dcpl OK " << dcpl << endl;
+    // Create the dataset.
+    dataset = H5Dcreate(file,
+        "MeshTriangles",	    // dataset name
+        H5T_NATIVE_INT, 		// data type
+        dataspace, H5P_DEFAULT,
+        dcpl, H5P_DEFAULT);
+    if (dataset<0) throw(Screen_FileWriteError());
+    // Write the data to the dataset
+    status = H5Dwrite (dataset,
+        H5T_NATIVE_INT, 		// mem type id
+        H5S_ALL, 			    // mem space id
+        dataspace,
+        H5P_DEFAULT,			// data transfer properties
+        tribuffer);
+    if (status<0) throw(Screen_FileWriteError());
+    cout << " .. data OK status=" << status << endl;
+    // Close and release resources.
+    status = H5Pclose (dcpl);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Dclose (dataset);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Sclose (dataspace);
+    if (status<0) throw(Screen_FileWriteError());
+    delete tribuffer;
+
+    // write the timing dataset
+    cout << "writing timing" << endl;
+    hsize_t t0dims[1];
+    t0dims[0] = Np;
+    // create dataspace
+    // Setting maximum size to NULL sets the maximum size to be the current size.
+    dataspace = H5Screate_simple (1, t0dims, NULL);
+    if (dataspace<0) throw(Screen_FileWriteError());
+    cout << " .. dataspace OK " << dataspace << endl;
+    // buffer the data
+    double *t0buffer = new double[Np];
+    double *t0bp = t0buffer;
+    for (int ip=0; ip<Np; ip++)
+        *t0bp++ = t0[ip];
+    cout << " .. buffer OK" << endl;
+    // Create the dataset creation property list
+    dcpl = H5Pcreate (H5P_DATASET_CREATE);
+    if (dcpl<0) throw(Screen_FileWriteError());
+    cout << " .. dcpl OK " << dcpl << endl;
+    // Create the dataset.
+    dataset = H5Dcreate(file,
+        "ObservationTime",	    // dataset name
+        H5T_NATIVE_DOUBLE,		// data type
+        dataspace, H5P_DEFAULT,
+        dcpl, H5P_DEFAULT);
+    if (dataset<0) throw(Screen_FileWriteError());
+    cout << " .. dataset OK " << dataset << endl;
+    // Write the data to the dataset
+    status = H5Dwrite (dataset,
+        H5T_NATIVE_DOUBLE, 		// mem type id
+        H5S_ALL, 			    // mem space id
+        dataspace,
+        H5P_DEFAULT,			// data transfer properties
+        t0buffer);
+    if (status<0) throw(Screen_FileWriteError());
+    cout << " .. data OK status=" << status << endl;
+    // attach scalar attributes
+    atts  = H5Screate(H5S_SCALAR);
+    if (atts<0) throw(Screen_FileWriteError());
+    att = H5Acreate2(dataset, "Nt", H5T_NATIVE_INT, atts, H5P_DEFAULT, H5P_DEFAULT);
+    if (att<0) throw(Screen_FileWriteError());
+    status = H5Awrite(att, H5T_NATIVE_INT, &Nt);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Aclose (att);
+    if (status<0) throw(Screen_FileWriteError());
+    att = H5Acreate2(dataset, "dt", H5T_NATIVE_DOUBLE, atts, H5P_DEFAULT, H5P_DEFAULT);
+    if (att<0) throw(Screen_FileWriteError());
+    status = H5Awrite(att, H5T_NATIVE_DOUBLE, &dt);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Aclose (att);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Sclose (atts);
+    if (status<0) throw(Screen_FileWriteError());
+    cout << " .. attributes OK" << endl;
+    // Close and release resources.
+    status = H5Pclose (dcpl);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Dclose (dataset);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Sclose (dataspace);
+    if (status<0) throw(Screen_FileWriteError());
+    delete t0buffer;
+
+    // write the fields dataset
+    cout << "writing timing" << endl;
+    hsize_t fdims[3];
+    fdims[0] = Np;
+    fdims[1] = Nt;
+    fdims[2] = 6;
+    // create dataspace
+    // Setting maximum size to NULL sets the maximum size to be the current size.
+    dataspace = H5Screate_simple (3, fdims, NULL);
+    if (dataspace<0) throw(Screen_FileWriteError());
+    cout << " .. dataspace OK " << dataspace << endl;
+    // buffer the data
+    double *fbuffer = new double[Np*Nt*6];
+    if (fbuffer==0) throw(Screen_MemoryAllocationError());
+    double *fbp = fbuffer;
+    for (int ip=0; ip<Np; ip++)
+    {
+        FieldTrace trace = get_trace(ip);
+        for (int it=0; it<Nt; it++)
+        {
+            ElMagField f = trace.get_field(it);
+            *fbp++ = f.E().x;
+            *fbp++ = f.E().y;
+            *fbp++ = f.E().z;
+            *fbp++ = f.B().x;
+            *fbp++ = f.B().y;
+            *fbp++ = f.B().z;
+        }
+    }
+    cout << " .. buffer OK" << endl;
+    // Create the dataset creation property list
+    dcpl = H5Pcreate (H5P_DATASET_CREATE);
+    if (dcpl<0) throw(Screen_FileWriteError());
+    cout << " .. dcpl OK " << dcpl << endl;
+    // Create the dataset.
+    dataset = H5Dcreate(file,
+        "ElMagField",           // dataset name
+        H5T_NATIVE_DOUBLE,		// data type
+        dataspace, H5P_DEFAULT,
+        dcpl, H5P_DEFAULT);
+    if (dataset<0) throw(Screen_FileWriteError());
+    cout << " .. dataset OK " << dataset << endl;
+    // Write the data to the dataset
+    status = H5Dwrite (dataset,
+        H5T_NATIVE_DOUBLE, 		// mem type id
+        H5S_ALL, 			    // mem space id
+        dataspace,
+        H5P_DEFAULT,			// data transfer properties
+        fbuffer);
+    if (status<0) throw(Screen_FileWriteError());
+    cout << " .. data OK status=" << status << endl;
+    // Close and release resources.
+    status = H5Pclose (dcpl);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Dclose (dataset);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Sclose (dataspace);
+    if (status<0) throw(Screen_FileWriteError());
+    delete fbuffer;
+
+    // we are done with the file
+    status = H5Fclose (file);
+    if (status<0) throw(Screen_FileWriteError());
+
+    // no errors have occured if we made it 'til here
+    cout << "writing HDF5 done." << endl;
+    return;
 }
 

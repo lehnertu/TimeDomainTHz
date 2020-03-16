@@ -243,7 +243,7 @@ int main(int argc, char* argv[])
             ElMagField f = ElMagField(E,B);
             local_dA_dn->set(it,f);
         };
-
+        
         // clean up the traces
         for (int i=0; i<count; i++) delete nbh_trace[i];
         delete local_trace;
@@ -359,6 +359,11 @@ int main(int argc, char* argv[])
     elapsed = stop_time.tv_sec-start_time.tv_sec +
         1e-9*(stop_time.tv_nsec-start_time.tv_nsec);
     std::cout << "time elapsed during computation : " << elapsed << " s" << std::endl;
+    
+    // print report
+    target->writeReport(&cout);
+    // write the target data to file
+    target->writeFieldHDF5(outfile);
     
     // release all allocated memory
     for (int ip=0; ip<source->get_Np(); ip++) delete source_dA_dt[ip];

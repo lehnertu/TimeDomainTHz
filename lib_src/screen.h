@@ -32,6 +32,8 @@ class Screen_FileWriteError { };
 class Screen_FileReadError { };
 /*  If normals are not sifficiently aligned -> throw an exception */
 class Screen_NormalsAlignmentError { };
+/*  Memory allocation may go wrong -> throw an exception */
+class Screen_MemoryAllocationError { };
 
 /*! data type for tringle references */
 struct tri_ref {
@@ -132,6 +134,9 @@ public:
      *  onto an output stream
      */
     void writeTraceReport(std::ostream *st, int ip);
+
+    /*! Write the screen data to an HDF5 file */
+    void writeFieldHDF5(std::string filename);
     
 private:
 
