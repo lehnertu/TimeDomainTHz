@@ -524,6 +524,17 @@ void Screen::writeFieldHDF5(std::string filename)
         tribuffer);
     if (status<0) throw(Screen_FileWriteError());
     cout << " .. data OK status=" << status << endl;
+    // attach scalar attributes
+    atts  = H5Screate(H5S_SCALAR);
+    if (atts<0) throw(Screen_FileWriteError());
+    att = H5Acreate2(dataset, "Ntri", H5T_NATIVE_INT, atts, H5P_DEFAULT, H5P_DEFAULT);
+    if (att<0) throw(Screen_FileWriteError());
+    status = H5Awrite(att, H5T_NATIVE_INT, &Np);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Aclose (att);
+    if (status<0) throw(Screen_FileWriteError());
+    status = H5Sclose (atts);
+    if (status<0) throw(Screen_FileWriteError());
     // Close and release resources.
     status = H5Pclose (dcpl);
     if (status<0) throw(Screen_FileWriteError());
