@@ -93,7 +93,7 @@ int main(int argc, char* argv[])
 
     std::cout << "computing the time derivatives of the fields ..." << std::endl;
     // record the start time
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
+    clock_gettime(CLOCK_REALTIME, &start_time);
 
     // compute a full set of time derivatives of the fields
     std::vector<FieldTrace*> source_dA_dt = std::vector<FieldTrace*>(source->get_Np());
@@ -105,165 +105,164 @@ int main(int argc, char* argv[])
     }
     
     // record the finish time
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop_time);
+    clock_gettime(CLOCK_REALTIME, &stop_time);
     double elapsed = stop_time.tv_sec-start_time.tv_sec +
         1e-9*(stop_time.tv_nsec-start_time.tv_nsec);
     std::cout << "time elapsed during computation : " << elapsed << " s" << std::endl;
 
     // prepare a full set of normal derivatives of the fields
-    // these will be filled with data once we have computed the transverse derivatives
+    // these will be overwritten with data while we compute the transverse derivatives
     std::vector<FieldTrace*> source_dA_dn = std::vector<FieldTrace*>(source->get_Np());
+    for (int ip=0; ip<source->get_Np(); ip++)
+    {
+        FieldTrace *deriv = new FieldTrace(source->get_trace(ip));
+        source_dA_dn[ip] = deriv;
+    };
+    
+    std::cout << "computing the spatial derivatives of the fields ..." << std::endl;
+    // record the start time
+    clock_gettime(CLOCK_REALTIME, &start_time);
+    
+    double cSquared = SpeedOfLight*SpeedOfLight;
+    int NOTS = source->get_Nt();
+    
     // parallel domain
     // optional parameter :  num_threads(32)
     // all variables declared outside this block are shared, e.g. source
-    // all variables declared inside this block are private, e.g. deriv
-    #pragma omp parallel num_threads(8)
+    // all variables declared inside this block are private
+    #pragma omp parallel
     {
         #pragma omp single
         {
             std::cout << "computing on " << omp_get_num_threads() << " parallel threads" << std::endl;
         }
         #pragma omp for
-        for (int ip=0; ip<source->get_Np(); ip++)
-        {
-            FieldTrace *deriv = new FieldTrace(source->get_trace(ip));
-            source_dA_dn[ip] = deriv;
+        for (int index=0; index<source->get_Np(); index++)
+        {    
+            // determine the neighbourhood of this cell
+            int nbh[24];
+            int count = source->get_Neighbourhood(index,nbh);
+            // std::cout << "neighbourhood size = " << count << std::endl;
+            // std::cout << "[";
+            // for (int i=0; i<count; i++) std::cout << nbh[i] << " ";
+            // std::cout << "]" << std::endl;
+            
+            // get the coordinates of the neighbours in the cell-local coordinate system
+            // assemble these into a matrix A
+            Vector local_ref = source->get_point(index);
+            Vector local_xi = source->get_xi(index);
+            Vector local_eta = source->get_eta(index);
+            Vector local_n = source->get_normal(index);
+            Eigen::VectorXd xi(count), eta(count), xi2(count), eta2(count), xieta(count), one(count);
+            for (int i=0; i<count; i++)
+            {
+                Vector local_coo = source->get_point(nbh[i]) - local_ref;
+                local_coo.transform(local_xi,local_eta,local_n);
+                one(i) = 1.0;
+                xi(i) = local_coo.x;
+                eta(i) = local_coo.y;
+                xi2(i) = local_coo.x * local_coo.x;
+                eta2(i) = local_coo.y * local_coo.y;
+                xieta(i) = local_coo.x * local_coo.y;
+            };
+            Eigen::MatrixXd A(count,6);
+            A.col(0) << one;
+            A.col(1) << xi;
+            A.col(2) << eta;
+            A.col(3) << xi2;
+            A.col(4) << eta2;
+            A.col(5) << xieta;
+            
+            // get the field traces of the neighbourhood in the local coordinate system
+            FieldTrace* local_trace = new FieldTrace(source->get_trace(index));
+            FieldTrace* nbh_trace[24];
+            for (int i=0; i<count; i++)
+            {
+                nbh_trace[i] = new FieldTrace(source->get_trace(nbh[i]));
+                nbh_trace[i]->transform(local_xi,local_eta,local_n);
+            };
+            
+            // get the time derivative of the center field in local coordinates
+            FieldTrace local_dA_dt = source_dA_dt[index];
+            local_dA_dt.transform(local_xi,local_eta,local_n);
+            
+            // this is the trace of normal derivatives we have to compute
+            FieldTrace *local_dA_dn = source_dA_dn[index];
+            
+            for (int it=0; it<NOTS; it++)
+            {
+                // we solve the equation A x = E, A x = B in a least-squares sense
+                Eigen::VectorXd Exi(count);
+                Eigen::VectorXd Eeta(count);
+                Eigen::VectorXd En(count);
+                Eigen::VectorXd Bxi(count);
+                Eigen::VectorXd Beta(count);
+                Eigen::VectorXd Bn(count);
+                Eigen::VectorXd fit(6);
+                double t = local_trace->get_time(it);
+                for (int i=0; i<count; i++)
+                {
+                    // we do not query the fields for the same time index but for the same time
+                    ElMagField F = nbh_trace[i]->get_field(t);
+                    Exi(i) = F.E().x;
+                    Eeta(i) = F.E().y;
+                    En(i) = F.E().z;
+                    Bxi(i) = F.B().x;
+                    Beta(i) = F.B().y;
+                    Bn(i) = F.B().z;
+                };
+                // the solution delivers the spatial derivatives of the fields
+                fit = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(Exi);
+                double dx_Ex = fit(1);
+                // double dy_Ex = fit(2);
+                fit = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(Eeta);
+                // double dx_Ey = fit(1);
+                double dy_Ey = fit(2);
+                fit = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(En);
+                double dx_Ez = fit(1);
+                double dy_Ez = fit(2);
+                fit = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(Bxi);
+                double dx_Bx = fit(1);
+                // double dy_Bx = fit(2);
+                fit = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(Beta);
+                // double dx_By = fit(1);
+                double dy_By = fit(2);
+                fit = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(Bn);
+                double dx_Bz = fit(1);
+                double dy_Bz = fit(2);
+
+                // obtain the time-derivatives of the fiels
+                ElMagField dt_F = local_dA_dt.get_field(it);
+                double dt_Ex = dt_F.E().x;
+                double dt_Ey = dt_F.E().y;
+                double dt_Bx = dt_F.B().x;
+                double dt_By = dt_F.B().y;
+                
+                // use Maxwells equations to compute the normal derivatives of the fields
+                double dz_Ex = dx_Ez - dt_By;
+                double dz_Ey = dy_Ez + dt_Bx;
+                double dz_Ez = -dx_Ex - dy_Ey;
+                double dz_Bx = dx_Bz + dt_Ey/cSquared;
+                double dz_By = dy_Bz - dt_Ex/cSquared;
+                double dz_Bz = -dx_Bx - dy_By;
+
+                // we set the normal derivatives by back-transforming the computed values
+                // into the global coordinate system
+                Vector E = local_xi*dz_Ex + local_eta*dz_Ey + local_n*dz_Ez;
+                Vector B = local_xi*dz_Bx + local_eta*dz_By + local_n*dz_Bz;
+                ElMagField f = ElMagField(E,B);
+                local_dA_dn->set(it,f);
+            };
+            
+            // clean up the traces
+            for (int i=0; i<count; i++) delete nbh_trace[i];
+            delete local_trace;
         };
     };
     // end parallel domain
     
-    std::cout << "computing the spatial derivatives of the fields ..." << std::endl;
-    // record the start time
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
-    
-    double cSquared = SpeedOfLight*SpeedOfLight;
-    int NOTS = source->get_Nt();
-    
-    // loop over the index of the cell considered
-    for (int index=0; index<source->get_Np(); index++)
-    {    
-        // determine the neighbourhood of this cell
-        int nbh[24];
-        int count = source->get_Neighbourhood(index,nbh);
-        // std::cout << "neighbourhood size = " << count << std::endl;
-        // std::cout << "[";
-        // for (int i=0; i<count; i++) std::cout << nbh[i] << " ";
-        // std::cout << "]" << std::endl;
-        
-        // get the coordinates of the neighbours in the cell-local coordinate system
-        // assemble these into a matrix A
-        Vector local_ref = source->get_point(index);
-        Vector local_xi = source->get_xi(index);
-        Vector local_eta = source->get_eta(index);
-        Vector local_n = source->get_normal(index);
-        Eigen::VectorXd xi(count), eta(count), xi2(count), eta2(count), xieta(count), one(count);
-        for (int i=0; i<count; i++)
-        {
-            Vector local_coo = source->get_point(nbh[i]) - local_ref;
-            local_coo.transform(local_xi,local_eta,local_n);
-            one(i) = 1.0;
-            xi(i) = local_coo.x;
-            eta(i) = local_coo.y;
-            xi2(i) = local_coo.x * local_coo.x;
-            eta2(i) = local_coo.y * local_coo.y;
-            xieta(i) = local_coo.x * local_coo.y;
-        };
-        Eigen::MatrixXd A(count,6);
-        A.col(0) << one;
-        A.col(1) << xi;
-        A.col(2) << eta;
-        A.col(3) << xi2;
-        A.col(4) << eta2;
-        A.col(5) << xieta;
-        
-        // get the field traces of the neighbourhood in the local coordinate system
-        FieldTrace* local_trace = new FieldTrace(source->get_trace(index));
-        FieldTrace* nbh_trace[24];
-        for (int i=0; i<count; i++)
-        {
-            nbh_trace[i] = new FieldTrace(source->get_trace(nbh[i]));
-            nbh_trace[i]->transform(local_xi,local_eta,local_n);
-        };
-        
-        // get the time derivative of the center field in local coordinates
-        FieldTrace local_dA_dt = source_dA_dt[index];
-        local_dA_dt.transform(local_xi,local_eta,local_n);
-        
-        // this is the trace of normal derivatives we have to compute
-        FieldTrace *local_dA_dn = source_dA_dn[index];
-        
-        for (int it=0; it<NOTS; it++)
-        {
-            // we solve the equation A x = E, A x = B in a least-squares sense
-            Eigen::VectorXd Exi(count);
-            Eigen::VectorXd Eeta(count);
-            Eigen::VectorXd En(count);
-            Eigen::VectorXd Bxi(count);
-            Eigen::VectorXd Beta(count);
-            Eigen::VectorXd Bn(count);
-            Eigen::VectorXd fit(6);
-            double t = local_trace->get_time(it);
-            for (int i=0; i<count; i++)
-            {
-                // we do not query the fields for the same time index but for the same time
-                ElMagField F = nbh_trace[i]->get_field(t);
-                Exi(i) = F.E().x;
-                Eeta(i) = F.E().y;
-                En(i) = F.E().z;
-                Bxi(i) = F.B().x;
-                Beta(i) = F.B().y;
-                Bn(i) = F.B().z;
-            };
-            // the solution delivers the spatial derivatives of the fields
-            fit = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(Exi);
-            double dx_Ex = fit(1);
-            // double dy_Ex = fit(2);
-            fit = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(Eeta);
-            // double dx_Ey = fit(1);
-            double dy_Ey = fit(2);
-            fit = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(En);
-            double dx_Ez = fit(1);
-            double dy_Ez = fit(2);
-            fit = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(Bxi);
-            double dx_Bx = fit(1);
-            // double dy_Bx = fit(2);
-            fit = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(Beta);
-            // double dx_By = fit(1);
-            double dy_By = fit(2);
-            fit = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(Bn);
-            double dx_Bz = fit(1);
-            double dy_Bz = fit(2);
-
-            // obtain the time-derivatives of the fiels
-            ElMagField dt_F = local_dA_dt.get_field(it);
-            double dt_Ex = dt_F.E().x;
-            double dt_Ey = dt_F.E().y;
-            double dt_Bx = dt_F.B().x;
-            double dt_By = dt_F.B().y;
-            
-            // use Maxwells equations to compute the normal derivatives of the fields
-            double dz_Ex = dx_Ez - dt_By;
-            double dz_Ey = dy_Ez + dt_Bx;
-            double dz_Ez = -dx_Ex - dy_Ey;
-            double dz_Bx = dx_Bz + dt_Ey/cSquared;
-            double dz_By = dy_Bz - dt_Ex/cSquared;
-            double dz_Bz = -dx_Bx - dy_By;
-
-            // we set the normal derivatives by back-transforming the computed values
-            // into the global coordinate system
-            Vector E = local_xi*dz_Ex + local_eta*dz_Ey + local_n*dz_Ez;
-            Vector B = local_xi*dz_Bx + local_eta*dz_By + local_n*dz_Bz;
-            ElMagField f = ElMagField(E,B);
-            local_dA_dn->set(it,f);
-        };
-        
-        // clean up the traces
-        for (int i=0; i<count; i++) delete nbh_trace[i];
-        delete local_trace;
-    };
-    
     // record the finish time
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop_time);
+    clock_gettime(CLOCK_REALTIME, &stop_time);
     elapsed = stop_time.tv_sec-start_time.tv_sec +
         1e-9*(stop_time.tv_nsec-start_time.tv_nsec);
     std::cout << "time elapsed during computation : " << elapsed << " s" << std::endl;
@@ -310,65 +309,81 @@ int main(int argc, char* argv[])
     
     std::cout << "propagating the fields ..." << std::endl;
     // record the start time
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
+    clock_gettime(CLOCK_REALTIME, &start_time);
 
-    for (int index=0; index<source->get_Np(); index++)
+    // parallel domain
+    // optional parameter :  num_threads(32)
+    // all variables declared outside this block are shared, e.g. source
+    // all variables declared inside this block are private
+    #pragma omp parallel
     {
-        Vector target_pos = target->get_point(index);
-        // this is the result sum (copy of the target trace)
-        FieldTrace propagated_trace = target->get_trace(index);
-        propagated_trace.zero();
-        // this is the component to be added to the result trace
-        FieldTrace component = propagated_trace;
-        
-        for (int isource=0; isource<source->get_Np(); isource++)
+        #pragma omp single
         {
-            Vector source_pos = source->get_point(isource);
-            double dA = source->get_area(isource)/(4.0*Pi);
-            Vector RVec = target_pos - source_pos;
-            double R = RVec.norm();
-            double R2 = R*R;
-            double R3 = R2*R;
-            Vector Normal = source->get_normal(isource);
-            try
+            std::cout << "computing on " << omp_get_num_threads() << " parallel threads" << std::endl;
+        }
+        #pragma omp for
+        for (int index=0; index<target->get_Np(); index++)
+        {
+            Vector target_pos = target->get_point(index);
+            // this is the result sum (copy of the target trace)
+            FieldTrace propagated_trace = target->get_trace(index);
+            propagated_trace.zero();
+            // this is the component to be added to the result trace
+            FieldTrace component = propagated_trace;
+            
+            for (int isource=0; isource<source->get_Np(); isource++)
             {
-                FieldTrace t1 = source->get_trace(isource);
-                t1.retard(R/SpeedOfLight, &component);
-                propagated_trace += component * (-dot(RVec,Normal)/R3) * dA;
-            }
-            catch(FieldTrace_Zero exc)
-            {
-                std::cout << "FieldTrace first term zero exception at i(source)=" << isource << std::endl;
-            }
-            try
-            {
-                FieldTrace t2 = *source_dA_dt[isource];
-                t2.retard(R/SpeedOfLight, &component);
-                propagated_trace += component * (-dot(RVec,Normal)/(R2*SpeedOfLight)) * dA;
-            }
-            catch(FieldTrace_Zero exc)
-            {
-                std::cout << "FieldTrace second term zero exception at i(source)=" << isource << std::endl;
-            }
-            try
-            {
-                FieldTrace t3 = *source_dA_dn[isource];
-                t3.retard(R/SpeedOfLight, &component);
-                // TODO: why is this term positive - should be negative
-                propagated_trace += component * (1.0/R) * dA;
-            }
-            catch(FieldTrace_Zero exc)
-            {
-                std::cout << "FieldTrace third term zero exception at i(source)=" << isource << std::endl;
-            }
+                Vector source_pos = source->get_point(isource);
+                double dA = source->get_area(isource)/(4.0*Pi);
+                Vector RVec = target_pos - source_pos;
+                double R = RVec.norm();
+                double R2 = R*R;
+                double R3 = R2*R;
+                Vector Normal = source->get_normal(isource);
+                try
+                {
+                    FieldTrace t1 = source->get_trace(isource);
+                    t1.retard(R/SpeedOfLight, &component);
+                    propagated_trace += component * (-dot(RVec,Normal)/R3) * dA;
+                }
+                catch(FieldTrace_Zero exc)
+                {
+                    std::cout << "FieldTrace 1st term zero propagating from i(source)=" << isource;
+                    std::cout << " to i(target)=" << index << std::endl;
+                }
+                try
+                {
+                    FieldTrace t2 = *source_dA_dt[isource];
+                    t2.retard(R/SpeedOfLight, &component);
+                    propagated_trace += component * (-dot(RVec,Normal)/(R2*SpeedOfLight)) * dA;
+                }
+                catch(FieldTrace_Zero exc)
+                {
+                    std::cout << "FieldTrace 2nd term zero propagating from i(source)=" << isource;
+                    std::cout << " to i(target)=" << index << std::endl;
+                }
+                try
+                {
+                    FieldTrace t3 = *source_dA_dn[isource];
+                    t3.retard(R/SpeedOfLight, &component);
+                    // TODO: why is this term positive - should be negative
+                    propagated_trace += component * (1.0/R) * dA;
+                }
+                catch(FieldTrace_Zero exc)
+                {
+                    std::cout << "FieldTrace 3rd term zero propagating from i(source)=" << isource;
+                    std::cout << " to i(target)=" << index << std::endl;
+                }
+            };
+            
+            target->set_trace(index, propagated_trace);
+            // target->writeTraceReport(&std::cout, index);
         };
-        
-        target->set_trace(index, propagated_trace);
-        target->writeTraceReport(&std::cout, index);
-    }
+    };
+    // end parallel domain
 
     // record the finish time
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop_time);
+    clock_gettime(CLOCK_REALTIME, &stop_time);
     elapsed = stop_time.tv_sec-start_time.tv_sec +
         1e-9*(stop_time.tv_nsec-start_time.tv_nsec);
     std::cout << "time elapsed during computation : " << elapsed << " s" << std::endl;
