@@ -38,8 +38,11 @@ A few libraries are required to build the executables.
 - For linear algebra calculations we use the [Eigen3](http://eigen.tuxfamily.org) library.
   It should preferably be installed through the systems package management system.
   In case this is not possible (i.e. no root access) it can be used from the git repository.
-  ```cd lib```
+  
+  ```cd lib/```
+  
   ```git clone https://gitlab.com/libeigen/eigen.git```
+  
   A cmake script is provided which will find the library in either case.
 
 - On most systems the [HDF5 library](https://support.hdfgroup.org/HDF5/) can be installed
