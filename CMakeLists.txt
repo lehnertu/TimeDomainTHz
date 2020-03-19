@@ -1,6 +1,10 @@
 cmake_minimum_required (VERSION 3.0)
 project (TimeDomainTHz)
 
+# where to find modules
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/lib")
+message(STATUS "cmake search path: ${CMAKE_MODULE_PATH}")
+
 set(CMAKE_VERBOSE_MAKEFILE OFF)
 
 # Set default build type.
@@ -28,17 +32,17 @@ else(OPENMP_FOUND)
 endif(OPENMP_FOUND)
 
 # EIGEN library
-find_package (Eigen3 3.3 REQUIRED NO_MODULE)
+find_package (Eigen3 3.3 REQUIRED)
+find_package (Eigen3)
 if (EIGEN3_FOUND)
     message(STATUS "Eigen3 includes ${EIGEN3_INCLUDE_DIR}")
 else (EIGEN3_FOUND)
-    message(STATUS "Eigen3 not found, trying ${PROJECT_SOURCE_DIR}/lib/eigen")
-    set(EIGEN3_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/lib/eigen")
+    message(STATUS "Eigen3 not found")
 endif (EIGEN3_FOUND)
 
 # where to find header files
 include_directories( ${PROJECT_SOURCE_DIR}/lib_src
-                     ${PROJECT_SOURCE_DIR}/lib/eigen
+                     ${EIGEN3_INCLUDE_DIR}
                      ${HDF5_INCLUDE_DIRS} )
 
 # we put all objects into a library that can be linked to the various executables
