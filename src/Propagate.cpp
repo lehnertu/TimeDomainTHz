@@ -113,12 +113,25 @@ int main(int argc, char* argv[])
     // prepare a full set of normal derivatives of the fields
     // these will be filled with data once we have computed the transverse derivatives
     std::vector<FieldTrace*> source_dA_dn = std::vector<FieldTrace*>(source->get_Np());
-    for (int ip=0; ip<source->get_Np(); ip++)
+    // parallel domain
+    // optional parameter :  num_threads(32)
+    // all variables declared outside this block are shared, e.g. source
+    // all variables declared inside this block are private, e.g. deriv
+    #pragma omp parallel num_threads(8)
     {
-        FieldTrace *deriv = new FieldTrace(source->get_trace(ip));
-        source_dA_dn[ip] = deriv;
-    }
-
+        #pragma omp single
+        {
+            std::cout << "computing on " << omp_get_num_threads() << " parallel threads" << std::endl;
+        }
+        #pragma omp for
+        for (int ip=0; ip<source->get_Np(); ip++)
+        {
+            FieldTrace *deriv = new FieldTrace(source->get_trace(ip));
+            source_dA_dn[ip] = deriv;
+        };
+    };
+    // end parallel domain
+    
     std::cout << "computing the spatial derivatives of the fields ..." << std::endl;
     // record the start time
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);

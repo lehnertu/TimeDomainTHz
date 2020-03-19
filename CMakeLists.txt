@@ -5,7 +5,7 @@ project (TimeDomainTHz)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/lib")
 message(STATUS "cmake search path: ${CMAKE_MODULE_PATH}")
 
-set(CMAKE_VERBOSE_MAKEFILE OFF)
+set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # Set default build type.
 if(NOT CMAKE_BUILD_TYPE)
