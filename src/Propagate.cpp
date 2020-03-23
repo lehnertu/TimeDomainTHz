@@ -36,6 +36,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include <iomanip>
 #include <math.h>
 #include <time.h>
 #include <omp.h>
@@ -89,7 +90,7 @@ int main(int argc, char* argv[])
     // test the computation of derivatives
     // **************************************
 
-    timespec start_time, stop_time;
+    timespec start_time, stop_time, print_time, now_time;
 
     std::cout << "computing the time derivatives of the fields ..." << std::endl;
     // record the start time
@@ -310,12 +311,14 @@ int main(int argc, char* argv[])
     std::cout << "propagating the fields ..." << std::endl;
     // record the start time
     clock_gettime(CLOCK_REALTIME, &start_time);
+    print_time = start_time;
 
+    int counter = 0;
     // parallel domain
     // optional parameter :  num_threads(32)
     // all variables declared outside this block are shared, e.g. source
     // all variables declared inside this block are private
-    #pragma omp parallel
+    #pragma omp parallel shared(counter)
     {
         #pragma omp single
         {
@@ -378,6 +381,25 @@ int main(int argc, char* argv[])
             
             target->set_trace(index, propagated_trace);
             // target->writeTraceReport(&std::cout, index);
+            
+            // all threads increment the counter
+            #pragma omp atomic
+            counter++;
+            // only the master thread keeps the time
+            if (omp_get_thread_num()==0)
+            {
+                clock_gettime(CLOCK_REALTIME, &now_time);
+                elapsed = now_time.tv_sec-print_time.tv_sec +
+                    1e-9*(now_time.tv_nsec-print_time.tv_nsec);
+                if (elapsed>10.0)
+                {
+                    print_time = now_time;
+                    elapsed = now_time.tv_sec-start_time.tv_sec +
+                    1e-9*(now_time.tv_nsec-start_time.tv_nsec);
+                    std::cout << "completed " << std::setprecision(4) << 100.0*(double)counter/(double)(target->get_Np()) << "%";
+                    std::cout << "   after " << elapsed << " seconds" << std::endl;
+                };
+            };
         };
     };
     // end parallel domain
@@ -389,6 +411,7 @@ int main(int argc, char* argv[])
     std::cout << "time elapsed during computation : " << elapsed << " s" << std::endl;
     
     // print report
+    std::cout << std::setprecision(6);
     target->writeReport(&cout);
     // write the target data to file
     target->writeFieldHDF5(outfile);
