@@ -186,7 +186,8 @@ class MeshedField():
         hf.close()
 
     def ShowMeshedField(self, highlight=[], scalars=[], scalarTitle="",
-                        showAxes=False, showCenters=False, pickAction=None, lut=None):
+                        showAxes=False, showCenters=False, showGrid=True,
+                        pickAction=None, lut=None):
         """
         Render a display of a mesh geometry using VTK.
         highlight=[]     : a list of cell indices which are to be highlighted
@@ -194,6 +195,7 @@ class MeshedField():
         scalarTitle=""   : title for the scalar bar
         showAxes=False   : show the axes of the coordinate system
         showCenters=False: display the triangle centers as dots
+        showGrid=True    : show the grid lines
         pickAction=None  : a call-back method to be performed when a triangle is clicked on, takes one parameter, the cell index
         lut=None         : vtk.vtkLookupTable() to be used for coloring the scalar field
         """
@@ -242,7 +244,10 @@ class MeshedField():
         meshActor.SetMapper(meshMapper)
         meshActor.GetProperty().SetPointSize(5)
         meshActor.GetProperty().SetColor(vtk.vtkNamedColors().GetColor3d("Red"))
-        meshActor.GetProperty().EdgeVisibilityOn()
+        if showGrid:
+            meshActor.GetProperty().EdgeVisibilityOn()
+        else:
+            meshActor.GetProperty().EdgeVisibilityOff()
         highlightActor = vtk.vtkActor()
         highlightActor.SetMapper(highlightMapper)
         highlightActor.GetProperty().SetPointSize(5)
@@ -329,9 +334,9 @@ class MeshedField():
         ax1 = fig.add_axes(rect1)
         ax2 = fig.add_axes(rect2, sharex=ax1)
         # plot the time-trace of the fields
-        l1 = ax1.plot(t, Ex, "r-", label=r'$E_x$')
-        l2 = ax1.plot(t, Ey, "b-", label=r'$E_y$')
-        l3 = ax1.plot(t, Ez, "g-", label=r'$E_z$')
+        l1 = ax1.plot(t*1e9, Ex, "r-", label=r'$E_x$')
+        l2 = ax1.plot(t*1e9, Ey, "b-", label=r'$E_y$')
+        l3 = ax1.plot(t*1e9, Ez, "g-", label=r'$E_z$')
         ax1.set_ylabel(r'$E$ [V/m]')
         lines = l1 + l2 + l3
         labels = [l.get_label() for l in lines]
@@ -339,9 +344,9 @@ class MeshedField():
         for label in ax1.get_xticklabels():
             label.set_visible(False)
         ax1.grid(True)
-        l4 = ax2.plot(t, Bx, "r-", label=r'$B_x$')
-        l5 = ax2.plot(t, By, "b-", label=r'$B_y$')
-        l6 = ax2.plot(t, Bz, "g-", label=r'$B_z$')
+        l4 = ax2.plot(t*1e9, Bx, "r-", label=r'$B_x$')
+        l5 = ax2.plot(t*1e9, By, "b-", label=r'$B_y$')
+        l6 = ax2.plot(t*1e9, Bz, "g-", label=r'$B_z$')
         ax2.set_ylabel(r'$B$ [T]')
         ax2.set_xlabel(r't [ns]')
         lines = l4 + l5 + l6
