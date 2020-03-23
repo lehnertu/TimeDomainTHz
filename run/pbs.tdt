@@ -1,0 +1,10 @@
+#PBS -N TimeDomainTHz
+#PBS -q default
+#PBS -l nodes=1:ppn=64
+#PBS -d /home/lehnertu/TimeDomainTHz/run
+#PBS -e /home/lehnertu/TimeDomainTHz/run/pbs.error
+#PBS -o /home/lehnertu/TimeDomainTHz/run/pbs.output
+#PBS -l cput=192:00:00
+#PBS -l walltime=12:00:00
+/home/lehnertu/TimeDomainTHz/run/run.tdt
+

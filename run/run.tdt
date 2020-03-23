@@ -1,0 +1,15 @@
+#!/bin/bash
+
+HOME=/home/lehnertu
+source $HOME/.bashrc
+
+basedir=$HOME/TimeDomainTHz
+bindir=$basedir/build
+rundir=$basedir/run
+
+module load gcc
+module load hdf5
+
+cd $rundir
+$bindir/Propagate MeshGaussian.h5 AngledTargetCoarse.h5 > propagate.log
+
