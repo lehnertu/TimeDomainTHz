@@ -185,25 +185,39 @@ class MeshedField():
         h5p = hf.create_dataset('ElMagField', data=self.A, dtype='f8')
         hf.close()
 
-    def ShowMeshedField(self, scalars=[], scalarTitle="", showAxes=False, showCenters=True, pickAction=None, lut=None):
+    def ShowMeshedField(self, highlight=[], scalars=[], scalarTitle="",
+                        showAxes=False, showCenters=False, pickAction=None, lut=None):
         """
         Render a display of a mesh geometry using VTK.
-        If given a scalar field is used to color the triangles accordingly.
-        If requested the center points of the triangles are rendered.
+        highlight=[]     : a list of cell indices which are to be highlighted
+        scalars=[]       : a scalar field is used to color the triangles accordingly
+        scalarTitle=""   : title for the scalar bar
+        showAxes=False   : show the axes of the coordinate system
+        showCenters=False: display the triangle centers as dots
+        pickAction=None  : a call-back method to be performed when a triangle is clicked on, takes one parameter, the cell index
+        lut=None         : vtk.vtkLookupTable() to be used for coloring the scalar field
         """
         # create a dataset for the triangle mesh
+        # and an additional one for the highlighted triangles
         pts = vtk.vtkPoints()
         for p in self.points:
             pts.InsertNextPoint(p)
         cells = vtk.vtkCellArray()
-        for t in self.triangles:
+        highlightCells = vtk.vtkCellArray()
+        for i, t in enumerate(self.triangles):
             cells.InsertNextCell(3, t)
+            if i in highlight: highlightCells.InsertNextCell(3, t)
         meshData = vtk.vtkPolyData()
         meshData.SetPoints(pts)
         meshData.SetPolys(cells)
-        # map the triangle mesh into the scene
+        highlightData = vtk.vtkPolyData()
+        highlightData.SetPoints(pts)
+        highlightData.SetPolys(highlightCells)
+        # map the triangle meshs into the scene
         meshMapper = vtk.vtkPolyDataMapper()
         meshMapper.SetInputData(meshData)
+        highlightMapper = vtk.vtkPolyDataMapper()
+        highlightMapper.SetInputData(highlightData)
         # color triangles by given scalar value
         if len(scalars)>0:
             if len(scalars)==self.Np:
@@ -223,6 +237,17 @@ class MeshedField():
                 sbar.SetPosition2(0.1,0.5)
             else:
                 print("number of scalars differs from number of triangles - no coloring")
+        # add the triangle mesh actors to the scene
+        meshActor = vtk.vtkActor()
+        meshActor.SetMapper(meshMapper)
+        meshActor.GetProperty().SetPointSize(5)
+        meshActor.GetProperty().SetColor(vtk.vtkNamedColors().GetColor3d("Red"))
+        meshActor.GetProperty().EdgeVisibilityOn()
+        highlightActor = vtk.vtkActor()
+        highlightActor.SetMapper(highlightMapper)
+        highlightActor.GetProperty().SetPointSize(5)
+        highlightActor.GetProperty().SetColor(vtk.vtkNamedColors().GetColor3d("Blue"))
+        highlightActor.GetProperty().EdgeVisibilityOn()
         # create a dataset for the center points
         if showCenters:
             cpts = vtk.vtkPoints()
@@ -234,13 +259,6 @@ class MeshedField():
             centerData = vtk.vtkPolyData()
             centerData.SetPoints(cpts)
             centerData.SetVerts(ccells)
-        colors = vtk.vtkNamedColors()
-        # add the triangle mesh actor to the scene
-        meshActor = vtk.vtkActor()
-        meshActor.SetMapper(meshMapper)
-        meshActor.GetProperty().SetPointSize(5)
-        meshActor.GetProperty().SetColor(colors.GetColor3d("Red"))
-        meshActor.GetProperty().EdgeVisibilityOn()
         # map the center points into the scene
         if showCenters:
             centerMapper = vtk.vtkPolyDataMapper()
@@ -254,7 +272,7 @@ class MeshedField():
         textMapper.SetInput("nothing")
         tprop = textMapper.GetTextProperty()
         tprop.SetJustificationToLeft()
-        tprop.SetColor(colors.GetColor3d("LightBlue"))
+        tprop.SetColor(vtk.vtkNamedColors().GetColor3d("LightBlue"))
         tprop.SetFontSize(20)
         textActor = vtk.vtkActor2D()
         textActor.SetMapper(textMapper)
@@ -262,7 +280,7 @@ class MeshedField():
         textActor.GetPositionCoordinate().SetValue(0.05, 0.2)
         # create a render window
         renderer = vtk.vtkRenderer()
-        renderer.SetBackground(colors.GetColor3d("SlateGray"))
+        renderer.SetBackground(vtk.vtkNamedColors().GetColor3d("SlateGray"))
         renderWindow = vtk.vtkRenderWindow()
         renderWindow.SetSize(800,600)
         renderWindow.AddRenderer(renderer)
@@ -274,6 +292,7 @@ class MeshedField():
         renderWindowInteractor.SetInteractorStyle(style)
         # add the actors to the scene
         renderer.AddActor(meshActor)
+        renderer.AddActor(highlightActor)
         if showCenters: renderer.AddActor(centerActor)
         # show the scalar bar
         if len(scalars)==self.Np:
@@ -380,10 +399,12 @@ class MyInteractor(vtk.vtkInteractorStyleTrackballCamera):
         return
 
 def powerLUT():
+    """
+    define a black-red-yellow-white color lookup table
+    """
     lut = vtk.vtkLookupTable()
     nc = 256
     ctf = vtk.vtkColorTransferFunction()
-    # black-red-yellow-white
     # ctf.SetColorSpaceToDiverging()
     ctf.AddRGBPoint(0.0, 0.0, 0.0, 0.0)
     ctf.AddRGBPoint(0.5, 0.7, 0.0, 0.0)
@@ -398,14 +419,16 @@ def powerLUT():
     return lut
 
 def phaseLUT():
+    """
+    define a mangenta-white-cyan color lookup table
+    """
     lut = vtk.vtkLookupTable()
     nc = 256
     ctf = vtk.vtkColorTransferFunction()
-    # black-red-yellow-white
     # ctf.SetColorSpaceToDiverging()
-    ctf.AddRGBPoint(0.0, 1.0, 0.0, 0.0)
-    ctf.AddRGBPoint(0.5, 0.0, 0.0, 0.0)
-    ctf.AddRGBPoint(1.0, 0.0, 0.0, 1.0)
+    ctf.AddRGBPoint(0.0, 0.5, 0.0, 0.5)
+    ctf.AddRGBPoint(0.5, 1.0, 1.0, 1.0)
+    ctf.AddRGBPoint(1.0, 0.0, 0.5, 0.5)
     lut.SetNumberOfTableValues(nc)
     lut.Build()
     for i in range(0, nc):
