@@ -131,7 +131,7 @@ Screen::Screen(std::string filename)
     if (H5Lexists(file, "ObservationTime", H5P_DEFAULT)<=0)
     {
         // no data available
-        cout << "dataset ObservationTime not existing" << std::endl;
+        if (DEBUGLEVEL>=1) cout << "dataset ObservationTime not existing" << std::endl;
         Nt = 0;
         dt = 0.0;
         t0 = std::vector<double>(Np,0.0);
@@ -172,7 +172,7 @@ Screen::Screen(std::string filename)
     if (H5Lexists(file, "ElMagField", H5P_DEFAULT)<=0)
     {
         // no data available
-        cout << "dataset ElMagField not existing" << std::endl;
+        if (DEBUGLEVEL>=1) cout << "dataset ElMagField not existing" << std::endl;
         FieldTrace zero_trace(0.0,dt,Nt);
         A = std::vector<FieldTrace*>(Np);
         for (int i=0; i<Np; i++)
@@ -365,7 +365,7 @@ void Screen::writeFieldHDF5(std::string filename)
     if (file<0) throw(Screen_FileWriteError());
 
     // write the mesh corner points
-    cout << "writing mesh points" << endl;
+    if (DEBUGLEVEL>=2) cout << "writing mesh points" << endl;
     hsize_t cdims[2];
     cdims[0] = Ncp;
     cdims[1] = 3;
@@ -422,7 +422,7 @@ void Screen::writeFieldHDF5(std::string filename)
     delete cbuffer;
 
     // write the position dataset
-    cout << "writing mesh center points" << endl;
+    if (DEBUGLEVEL>=2) cout << "writing mesh center points" << endl;
     hsize_t pdims[2];
     pdims[0] = Np;
     pdims[1] = 3;
@@ -479,7 +479,7 @@ void Screen::writeFieldHDF5(std::string filename)
     delete pbuffer;
 
     // write the mesh triangles
-    cout << "writing mesh triangles" << endl;
+    if (DEBUGLEVEL>=2) cout << "writing mesh triangles" << endl;
     hsize_t tdims[2];
     tdims[0] = Np;
     tdims[1] = 3;
@@ -536,7 +536,7 @@ void Screen::writeFieldHDF5(std::string filename)
     delete tribuffer;
 
     // write the timing dataset
-    cout << "writing timing" << endl;
+    if (DEBUGLEVEL>=2) cout << "writing timing" << endl;
     hsize_t t0dims[1];
     t0dims[0] = Np;
     // create dataspace
@@ -593,7 +593,7 @@ void Screen::writeFieldHDF5(std::string filename)
     delete t0buffer;
 
     // write the fields dataset
-    cout << "writing fields" << endl;
+    if (DEBUGLEVEL>=2) cout << "writing fields" << endl;
     hsize_t fdims[3];
     fdims[0] = Np;
     fdims[1] = Nt;

@@ -313,12 +313,15 @@ int main(int argc, char* argv[])
     clock_gettime(CLOCK_REALTIME, &start_time);
     print_time = start_time;
 
-    int counter = 0;
+    // counter for the number of target cells computed
+    volatile int counter = 0;
+    // counter for the number of zero-field warnings encountered
+    volatile int warnings_counter = 0;
     // parallel domain
     // optional parameter :  num_threads(32)
     // all variables declared outside this block are shared, e.g. source
     // all variables declared inside this block are private
-    #pragma omp parallel shared(counter)
+    #pragma omp parallel shared(counter, warnings_counter)
     {
         #pragma omp single
         {
@@ -351,8 +354,10 @@ int main(int argc, char* argv[])
                 }
                 catch(FieldTrace_Zero exc)
                 {
-                    std::cout << "FieldTrace 1st term zero propagating from i(source)=" << isource;
-                    std::cout << " to i(target)=" << index << std::endl;
+                    #pragma omp atomic
+                    warnings_counter++;
+                    if (DEBUGLEVEL>=2) std::cout << "FieldTrace 1st term zero propagating from i(source)=" << isource;
+                    if (DEBUGLEVEL>=2) std::cout << " to i(target)=" << index << std::endl;
                 }
                 try
                 {
@@ -362,8 +367,10 @@ int main(int argc, char* argv[])
                 }
                 catch(FieldTrace_Zero exc)
                 {
-                    std::cout << "FieldTrace 2nd term zero propagating from i(source)=" << isource;
-                    std::cout << " to i(target)=" << index << std::endl;
+                    #pragma omp atomic
+                    warnings_counter++;
+                    if (DEBUGLEVEL>=2) std::cout << "FieldTrace 2nd term zero propagating from i(source)=" << isource;
+                    if (DEBUGLEVEL>=2) std::cout << " to i(target)=" << index << std::endl;
                 }
                 try
                 {
@@ -374,8 +381,10 @@ int main(int argc, char* argv[])
                 }
                 catch(FieldTrace_Zero exc)
                 {
-                    std::cout << "FieldTrace 3rd term zero propagating from i(source)=" << isource;
-                    std::cout << " to i(target)=" << index << std::endl;
+                    #pragma omp atomic
+                    warnings_counter++;
+                    if (DEBUGLEVEL>=2) std::cout << "FieldTrace 3rd term zero propagating from i(source)=" << isource;
+                    if (DEBUGLEVEL>=2) std::cout << " to i(target)=" << index << std::endl;
                 }
             };
             
@@ -397,7 +406,9 @@ int main(int argc, char* argv[])
                     elapsed = now_time.tv_sec-start_time.tv_sec +
                     1e-9*(now_time.tv_nsec-start_time.tv_nsec);
                     std::cout << "completed " << std::setprecision(4) << 100.0*(double)counter/(double)(target->get_Np()) << "%";
-                    std::cout << "   after " << elapsed << " seconds" << std::endl;
+                    std::cout << "   after " << elapsed << " seconds";
+                    if (warnings_counter>0) std::cout << "   received " << warnings_counter << " 'zero field' warnings";
+                    std::cout << std::endl;
                 };
             };
         };

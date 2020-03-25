@@ -40,3 +40,11 @@
 // the electron rest mass in kg can be obtained as
 // mecsquared*ElementaryCharge/SpeedOfLight^2
 
+/*! define debug levels:
+ *  0: suppress all printouts except for those leading to an immediate abort
+ *  1: show errors and summary reports
+ *  2: show all warnings
+ *  3: print additional debugging information
+ */
+#define DEBUGLEVEL 1
+
