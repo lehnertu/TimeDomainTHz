@@ -117,35 +117,60 @@ class MeshedField():
             area.append(0.5*np.linalg.norm(np.cross(r1,r2)))
         return np.array(area)
 
+    def MeshNormal(self, id):
+        """
+        Compute the normal vectors of one mesh cell
+        """
+        t = self.triangles[id]
+        p1 = self.points[t[0]]
+        p2 = self.points[t[1]]
+        p3 = self.points[t[2]]
+        r1 = p3-p1
+        r2 = p2-p1
+        n = np.cross(r1,r2)
+        return n / np.linalg.norm(n)
+
     def MeshNormals(self):
         """
         Compute the normal vectors of all mesh cells
         """
-        normals=[]
-        for i, t in enumerate(self.triangles):
-            p1 = self.points[t[0]]
-            p2 = self.points[t[1]]
-            p3 = self.points[t[2]]
-            r1 = p3-p1
-            r2 = p2-p1
-            n = np.cross(r1,r2)
-            normals.append(n / np.linalg.norm(n))
+        normals=[self.MeshNormal(i) for i in range(self.Np)]
         return np.array(normals)
 
-    def EnergyFlowDensity(self):
+    def BoundingBox(self):
         """
-        Compute the Poynting vectors (energy flow density) of all field traces
+        Return the interval span by the mesh in every direction of the cartesian coordinates
+        """
+        x = np.array([p[0] for p in self.points])
+        xlim = (np.amin(x),np.amax(x))
+        y = np.array([p[1] for p in self.points])
+        ylim = (np.amin(y),np.amax(y))
+        z = np.array([p[2] for p in self.points])
+        zlim = (np.amin(z),np.amax(z))
+        return (xlim,ylim,zlim)
+    
+    def EnergyFlowVector(self,id):
+        """
+        Compute the Poynting vector (energy flow density) of a field trace
         integrated over all time with time step dt
         """
-        Energy = []
-        for trace in self.A:
-            EVec = trace[:,0:3]
-            BVec = trace[:,3:6]
-            SVec = np.cross(EVec, BVec) / constants.mu_0
-            Energy.append((SVec.sum(axis=0))*self.dt)
-        return np.array(Energy)
+        trace = self.A[id]
+        EVec = trace[:,0:3]
+        BVec = trace[:,3:6]
+        SVec = np.cross(EVec, BVec) / constants.mu_0
+        return SVec.sum(axis=0)*self.dt
 
-    def FieldAtTime(self,t):
+    def NormalEnergyFlow(self,id):
+        """
+        Compute the Poynting vector (energy flow density) of a field trace
+        integrated over all time with time step dt. Return the normal component.
+        Energy incident from the side, the normal is pointing to, is counted positive.
+        """
+        S = self.EnergyFlowVector(id)
+        n = self.MeshNormal(id)
+        return np.dot(S,-n)
+
+    def FieldsAtTime(self,t):
         """
         Compute the fields of all field traces at a given time
         """
