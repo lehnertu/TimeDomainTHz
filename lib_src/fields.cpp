@@ -275,10 +275,13 @@ void FieldTrace::retard(double delta_t, FieldTrace *target)
     };
     if (target->Poynting().norm()==0.0)
     {
-        std::cout << "retard from t0=" << t0 << " N=" << N << " P=" << Poynting().norm() << std::endl;
-        std::cout << "      by delta=" << delta_t << "s" << std::endl;
-        std::cout << "retard   to t0=" << target->get_t0() << " N=" << target->get_N();
-        std::cout << " P=" << target->Poynting().norm() << std::endl;
+        if (DEBUGLEVEL>=2)
+        { 
+            std::cout << "retard from t0=" << t0 << " N=" << N << " P=" << Poynting().norm() << std::endl;
+            std::cout << "      by delta=" << delta_t << "s" << std::endl;
+            std::cout << "retard   to t0=" << target->get_t0() << " N=" << target->get_N();
+            std::cout << " P=" << target->Poynting().norm() << std::endl;
+        }
         throw(FieldTrace_Zero());
     };
 }
