@@ -112,6 +112,7 @@ Screen::Screen(std::string filename)
         H5S_ALL,
         H5P_DEFAULT,			// data transfer properties
         buf);
+    if (status<0) throw(Screen_FileReadError());
     status = H5Dclose(dataset);
     if (status<0) throw(Screen_FileReadError());
     triangles = std::vector<tri_ref>(Np);
@@ -139,6 +140,7 @@ Screen::Screen(std::string filename)
     else
     {
         dataset = H5Dopen2(file, "ObservationTime", H5P_DEFAULT);
+        if (dataset<0) throw(Screen_FileReadError());
         attr = H5Aopen_name(dataset, "Nt");
         if (attr<0) throw(Screen_FileReadError());
         status =  H5Aread(attr, H5T_NATIVE_INT, &Nt);
@@ -181,6 +183,7 @@ Screen::Screen(std::string filename)
     else
     {
         dataset = H5Dopen2(file, "ElMagField", H5P_DEFAULT);
+        if (dataset<0) throw(Screen_FileReadError());
         ElMagField *field = new ElMagField[Np*Nt];
         status = H5Dread (dataset,
             H5T_NATIVE_DOUBLE, 		// mem type id
@@ -188,6 +191,7 @@ Screen::Screen(std::string filename)
             H5S_ALL,
             H5P_DEFAULT,			// data transfer properties
             field);
+        if (status<0) throw(Screen_FileReadError());
         status = H5Dclose(dataset);
         if (status<0) throw(Screen_FileReadError());
         // transfer the data into the internal data structures

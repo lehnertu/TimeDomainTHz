@@ -60,4 +60,10 @@ target_link_libraries(Propagate
         Eigen3::Eigen
         ${ZLIB_LIBRARY_RELEASE} )
 
+add_executable(Reflection ${PROJECT_SOURCE_DIR}/src/Reflection.cpp)
+target_link_libraries(Reflection
+        thzlib
+        ${HDF5_LIBRARIES}
+        Eigen3::Eigen
+        ${ZLIB_LIBRARY_RELEASE} )
 

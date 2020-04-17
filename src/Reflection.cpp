@@ -20,14 +20,15 @@
  * =========================================================================*/
 
 /*!
-    \brief Time-Domain THz general (screen-to-screen) propagation tool.
+    \brief Time-Domain THz general (screen-to-screen) reflection tool.
     
     @author Ulf Lehnert
     @date 21.11.2019
     @file Propagate.cpp
     
     The input beam is read from a HDF5 file defining the field traces on a meshed screen.
-    The input beam is considered just a beam decription, is propagated without modification.
+    The surface of the screen is considered a perfect electric conductor reflecting
+    the incident fields. The reflected beam is propagated to an output screen.
     The geometry of the output screen is read from a second HDF5 file.
     From this second file only the geometry information is used, it will be
     rewritten with the computed output fields.
@@ -92,6 +93,47 @@ int main(int argc, char* argv[])
     std::cout << "n =   (" << avg_normal.x << ", " << avg_normal.y << ", " << avg_normal.z << ")" << std::endl;
     std::cout << "xi =  (" << avg_xi.x << ", " << avg_xi.y << ", " << avg_xi.z << ")" << std::endl;
     std::cout << "eta = (" << avg_eta.x << ", " << avg_eta.y << ", " << avg_eta.z << ")" << std::endl;
+
+    // **************************************
+    // compute the surface reflected fields
+    // **************************************
+    // Just above the surface of a perfect electric conductor only normal electric
+    // and tangential magnetic fields can exist.
+    // The sum of incident and reflected fields has to satisfy this condition.
+    // Therefore, tangential electric and normal magnetic field components
+    // are reversed upon reflection. Only the reflected fields are later propagated.
+
+    std::cout << std::endl << "computing the reflected fields ..." << std::endl;
+    // record the start time
+    clock_gettime(CLOCK_REALTIME, &start_time);
+
+    for (int index=0; index<source->get_Np(); index++)
+    {
+        // get one field trace
+        FieldTrace trace = source->get_trace(index);
+        // compute reflection
+        Vector normal = source->get_normal(index);
+        normal.normalize();
+        for (int it=0; it<trace.get_N(); it++)
+        {
+            ElMagField EB = trace.get_field(it);
+            Vector E = EB.E();
+            Vector En = normal * dot(E, normal);
+            Vector Et = E - En;
+            Vector B = EB.B();
+            Vector Bn = normal * dot(B, normal);
+            Vector Bt = B - Bn;
+            trace.set(it, ElMagField(En-Et,Bt-Bn));
+        };
+        // write it back to the source
+        source->set_trace(index, trace);
+    };
+
+    // record the finish time
+    clock_gettime(CLOCK_REALTIME, &stop_time);
+    elapsed = stop_time.tv_sec-start_time.tv_sec +
+        1e-9*(stop_time.tv_nsec-start_time.tv_nsec);
+    std::cout << "time elapsed during computation : " << elapsed << " s" << std::endl;
 
     // **************************************
     // compute the derivatives of the fields
@@ -339,7 +381,6 @@ int main(int argc, char* argv[])
     clock_gettime(CLOCK_REALTIME, &start_time);
     print_time = start_time;
 
-    // counter for the number of target cells computed
     counter = 0;
     // counter for the number of zero-field warnings encountered
     volatile int warnings_counter = 0;
