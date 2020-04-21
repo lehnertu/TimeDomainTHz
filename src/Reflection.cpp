@@ -87,12 +87,47 @@ int main(int argc, char* argv[])
         avg_xi += source->get_xi(ip);
         avg_eta += source->get_eta(ip);
     };
+    
+    // smalles box in space and time containing all field points
+    double bbx1 = 1e30;
+    double bbx2 = -1e30;
+    double bby1 = 1e30;
+    double bby2 = -1e30;
+    double bbz1 = 1e30;
+    double bbz2 = -1e30;
+    double bbt1 = 1e30;
+    double bbt2 = -1e30;
+    for (int ip=0; ip<source->get_Np(); ip++)
+    {
+        Vector p = source->get_point(ip);
+        if (p.x<bbx1) bbx1=p.x;
+        if (p.x>bbx2) bbx2=p.x;
+        if (p.y<bby1) bby1=p.y;
+        if (p.y>bby2) bby2=p.y;
+        if (p.z<bbz1) bbz1=p.z;
+        if (p.z>bbz2) bbz2=p.z;
+        double t0 = source->get_t0(ip);
+        if (t0<bbt1) bbt1=t0;
+        double tmax = t0 + source->get_Nt() * source->get_dt();
+        if (tmax>bbt2) bbt2=tmax;
+    };
+    std::cout << "bounding box:" << std::endl;
+    std::cout << "x : (" << bbx1 << ", " << bbx2 << ") m" << std::endl;
+    std::cout << "y : (" << bby1 << ", " << bby2 << ") m" << std::endl;
+    std::cout << "z : (" << bbz1 << ", " << bbz2 << ") m" << std::endl;
+    std::cout << "t : (" << 1e9*bbt1 << ", " << 1e9*bbt2 << ") ns" << std::endl;
+
     avg_normal /= source->get_Np();
     avg_xi /= source->get_Np();
     avg_eta /= source->get_Np();
     std::cout << "n =   (" << avg_normal.x << ", " << avg_normal.y << ", " << avg_normal.z << ")" << std::endl;
     std::cout << "xi =  (" << avg_xi.x << ", " << avg_xi.y << ", " << avg_xi.z << ")" << std::endl;
     std::cout << "eta = (" << avg_eta.x << ", " << avg_eta.y << ", " << avg_eta.z << ")" << std::endl;
+    Vector S(0.0, 0.0, 0.0);
+    for (int ip=0; ip<source->get_Np(); ip++)
+        S += source->Poynting(ip)*source->get_area(ip);
+    std::cout << "total energy flow vector : (" << S.x << ", " << S.y << ", " << S.z << ") J" << std::endl;
+
 
     // **************************************
     // compute the surface reflected fields
@@ -134,6 +169,11 @@ int main(int argc, char* argv[])
     elapsed = stop_time.tv_sec-start_time.tv_sec +
         1e-9*(stop_time.tv_nsec-start_time.tv_nsec);
     std::cout << "time elapsed during computation : " << elapsed << " s" << std::endl;
+
+    Vector Sr(0.0, 0.0, 0.0);
+    for (int ip=0; ip<source->get_Np(); ip++)
+        Sr += source->Poynting(ip)*source->get_area(ip);
+    std::cout << "total energy flow vector : (" << Sr.x << ", " << Sr.y << ", " << Sr.z << ") J" << std::endl;
 
     // **************************************
     // compute the derivatives of the fields
@@ -346,6 +386,35 @@ int main(int argc, char* argv[])
     // print report
     target->writeReport(&cout);
     
+    // smalles box in space and time containing all field points
+    bbx1 = 1e30;
+    bbx2 = -1e30;
+    bby1 = 1e30;
+    bby2 = -1e30;
+    bbz1 = 1e30;
+    bbz2 = -1e30;
+    bbt1 = 1e30;
+    bbt2 = -1e30;
+    for (int ip=0; ip<target->get_Np(); ip++)
+    {
+        Vector p = target->get_point(ip);
+        if (p.x<bbx1) bbx1=p.x;
+        if (p.x>bbx2) bbx2=p.x;
+        if (p.y<bby1) bby1=p.y;
+        if (p.y>bby2) bby2=p.y;
+        if (p.z<bbz1) bbz1=p.z;
+        if (p.z>bbz2) bbz2=p.z;
+        double t0 = target->get_t0(ip);
+        if (t0<bbt1) bbt1=t0;
+        double tmax = t0 + target->get_Nt() * target->get_dt();
+        if (tmax>bbt2) bbt2=tmax;
+    };
+    std::cout << "bounding box:" << std::endl;
+    std::cout << "x : (" << bbx1 << ", " << bbx2 << ") m" << std::endl;
+    std::cout << "y : (" << bby1 << ", " << bby2 << ") m" << std::endl;
+    std::cout << "z : (" << bbz1 << ", " << bbz2 << ") m" << std::endl;
+    std::cout << "t : (" << 1e9*bbt1 << ", " << 1e9*bbt2 << ") ns" << std::endl;
+
     avg_normal = Vector(0.0,0.0,0.0);
     avg_xi = Vector(0.0,0.0,0.0);
     avg_eta = Vector(0.0,0.0,0.0);
@@ -413,9 +482,9 @@ int main(int argc, char* argv[])
                 double R2 = R*R;
                 double R3 = R2*R;
                 Vector Normal = source->get_normal(isource);
+                FieldTrace t1 = source->get_trace(isource);
                 try
                 {
-                    FieldTrace t1 = source->get_trace(isource);
                     t1.retard(R/SpeedOfLight, &component);
                     propagated_trace += component * (-dot(RVec,Normal)/R3) * dA;
                 }
@@ -423,8 +492,16 @@ int main(int argc, char* argv[])
                 {
                     #pragma omp atomic
                     warnings_counter++;
-                    if (DEBUGLEVEL>=2) std::cout << "FieldTrace 1st term zero propagating from i(source)=" << isource;
-                    if (DEBUGLEVEL>=2) std::cout << " to i(target)=" << index << std::endl;
+                    if (DEBUGLEVEL>=2)
+                    {
+                        std::cout << "FieldTrace 1st term zero propagating from i(source)=" << isource;
+                        std::cout << " to i(target)=" << index << std::endl;
+                        std::cout << "    x = (" << source_pos.x << ", " << source_pos.y << ", " << source_pos.z << ")";
+                        std::cout << "    t = " << t1.get_t0() << " ... " << t1.get_t0()+t1.get_N()*t1.get_dt() << std::endl;
+                        std::cout << "    x = (" << target_pos.x << ", " << target_pos.y << ", " << target_pos.z << ")";
+                        std::cout << "    t = " << component.get_t0();
+                        std::cout << " ... " << component.get_t0()+component.get_N()*component.get_dt() << std::endl;
+                    }
                 }
                 try
                 {

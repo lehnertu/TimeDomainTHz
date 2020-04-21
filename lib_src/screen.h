@@ -26,6 +26,8 @@
 #include "vector.h"
 #include "fields.h"
 
+// TODO: all index out-of-range possibilities have to be checked
+
 /*  Writing an HDF5 file may go wrong -> throw an exception */
 class Screen_FileWriteError { };
 /*  Reading an HDF5 file may go wrong -> throw an exception */
@@ -119,6 +121,11 @@ public:
      */
     int get_Neighbourhood(int index, int *buffer);
     
+    /*! Get the energy flow density vector of one trace
+     *  integrated over time
+     */
+    Vector Poynting(int ip) { return A[ip]->Poynting(); };
+
     /*! Compute the total electromagnetic energy flowing through the screen
      *  Energy flow vectors opposite the normal vector are counted positive.
      */

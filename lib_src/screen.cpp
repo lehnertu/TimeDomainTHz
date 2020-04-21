@@ -337,7 +337,7 @@ void Screen::writeReport(std::ostream *st)
         Vector p = get_point(peak_index);
         *st << "peak pos["  << peak_index << "] =   (" << p.x << ", " << p.y << ", " << p.z << ") m   " << std::endl;
         *st << "peak energy density = " << peak << " J/m²" << std::endl;
-        *st << "Poynting vector S = (" << Sp.x << ", " << Sp.y << ", " << Sp.z << ") J/m²" << std::endl;
+        *st << "peak Poynting vector S = (" << Sp.x << ", " << Sp.y << ", " << Sp.z << ") J/m²" << std::endl;
         *st << "t0  = " << A[peak_index]->get_t0()*1e9 << " ns  " << std::endl;
         *st << "dt  = " << dt*1.0e9 << " ns" << std::endl;
     };

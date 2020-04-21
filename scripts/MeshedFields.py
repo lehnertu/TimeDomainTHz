@@ -342,43 +342,7 @@ class MeshedField():
 
     def ShowFieldTrace(self, index):
         trace = self.A[index]
-        NOTS = trace.shape[0]
-        t = np.linspace(self.t0[index],self.t0[index]+(NOTS-1)*self.dt, NOTS)
-        # get the individual field components
-        Ex = trace[:,0]
-        Ey = trace[:,1]
-        Ez = trace[:,2]
-        Bx = trace[:,3]
-        By = trace[:,4]
-        Bz = trace[:,5]
-        # prepare the plot geometry
-        left, width = 0.15, 0.80
-        rect1 = [left, 0.55, width, 0.40]  #left, bottom, width, height
-        rect2 = [left, 0.08, width, 0.40]
-        fig = plt.figure(1,figsize=(8,6))
-        ax1 = fig.add_axes(rect1)
-        ax2 = fig.add_axes(rect2, sharex=ax1)
-        # plot the time-trace of the fields
-        l1 = ax1.plot(t*1e9, Ex, "r-", label=r'$E_x$')
-        l2 = ax1.plot(t*1e9, Ey, "b-", label=r'$E_y$')
-        l3 = ax1.plot(t*1e9, Ez, "g-", label=r'$E_z$')
-        ax1.set_ylabel(r'$E$ [V/m]')
-        lines = l1 + l2 + l3
-        labels = [l.get_label() for l in lines]
-        ax1.legend(lines,labels,loc='upper right')
-        for label in ax1.get_xticklabels():
-            label.set_visible(False)
-        ax1.grid(True)
-        l4 = ax2.plot(t*1e9, Bx, "r-", label=r'$B_x$')
-        l5 = ax2.plot(t*1e9, By, "b-", label=r'$B_y$')
-        l6 = ax2.plot(t*1e9, Bz, "g-", label=r'$B_z$')
-        ax2.set_ylabel(r'$B$ [T]')
-        ax2.set_xlabel(r't [ns]')
-        lines = l4 + l5 + l6
-        labels = [l.get_label() for l in lines]
-        ax2.legend(lines,labels,loc='upper right')
-        ax2.grid(True)
-        plt.show()
+        ShowTrace(trace,self.t0[index],self.dt)
         
 # --------------------------------------------------------------------------
 #   helper code for field traces
@@ -398,6 +362,45 @@ def InterpolateTrace(trace,t0,dt,t):
         field = trace[index]*(1.0-frac) + trace[index+1]*frac
     return field
     
+def ShowTrace(trace,t0,dt):
+    NOTS = trace.shape[0]
+    t = np.linspace(t0,t0+(NOTS-1)*dt, NOTS)
+    # get the individual field components
+    Ex = trace[:,0]
+    Ey = trace[:,1]
+    Ez = trace[:,2]
+    Bx = trace[:,3]
+    By = trace[:,4]
+    Bz = trace[:,5]
+    # prepare the plot geometry
+    left, width = 0.15, 0.80
+    rect1 = [left, 0.55, width, 0.40]  #left, bottom, width, height
+    rect2 = [left, 0.08, width, 0.40]
+    fig = plt.figure(1,figsize=(8,6))
+    ax1 = fig.add_axes(rect1)
+    ax2 = fig.add_axes(rect2, sharex=ax1)
+    # plot the time-trace of the fields
+    l1 = ax1.plot(t*1e9, Ex, "r-", label=r'$E_x$')
+    l2 = ax1.plot(t*1e9, Ey, "b-", label=r'$E_y$')
+    l3 = ax1.plot(t*1e9, Ez, "g-", label=r'$E_z$')
+    ax1.set_ylabel(r'$E$ [V/m]')
+    lines = l1 + l2 + l3
+    labels = [l.get_label() for l in lines]
+    ax1.legend(lines,labels,loc='upper right')
+    for label in ax1.get_xticklabels():
+        label.set_visible(False)
+    ax1.grid(True)
+    l4 = ax2.plot(t*1e9, Bx, "r-", label=r'$B_x$')
+    l5 = ax2.plot(t*1e9, By, "b-", label=r'$B_y$')
+    l6 = ax2.plot(t*1e9, Bz, "g-", label=r'$B_z$')
+    ax2.set_ylabel(r'$B$ [T]')
+    ax2.set_xlabel(r't [ns]')
+    lines = l4 + l5 + l6
+    labels = [l.get_label() for l in lines]
+    ax2.legend(lines,labels,loc='upper right')
+    ax2.grid(True)
+    plt.show()
+        
 # --------------------------------------------------------------------------
 #   helper code for visualization
 # --------------------------------------------------------------------------
